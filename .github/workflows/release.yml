@@ -13,8 +13,16 @@ jobs:
       contributors_content: ${{ steps.contributors.outputs.content }}
     steps:
       - id: set-ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "version=3.26X1" >> $GITHUB_OUTPUT
+          set -e
+          prev=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
+            | jq -r '.[].tag_name' | grep -E '^(beta-)?3\.26X[0-9]+$' | sed -E 's/^.*X//' | sort -n | tail -n 1 || true)
+          n=$(( ${prev:-0} + 1 ))
+          echo "version=3.26X$n" >> $GITHUB_OUTPUT
+          echo "已确定版本号 3.26X$n（上一版 ${prev:-无}）"
       - id: check
         run: |
           if [ -n "${{ secrets.GITEE_TOKEN }}" ]; then
