@@ -119,6 +119,20 @@ object ApplicationThemeManager {
         var nightBottomBarId: String? = null,
         var dayCoverGroupId: Long? = null,
         var nightCoverGroupId: Long? = null,
+        /** 日间启动页背景图路径；null 表示主题包未携带，导入/应用时保持现状 */
+        var daySplashImage: String? = null,
+        /** 夜间启动页背景图路径；null 表示主题包未携带，导入/应用时保持现状 */
+        var nightSplashImage: String? = null,
+        /** 日间阅读页背景图路径；null 表示主题包未携带，导入/应用时保持现状 */
+        var dayReadBgImage: String? = null,
+        /** 夜间阅读页背景图路径；null 表示主题包未携带，导入/应用时保持现状 */
+        var nightReadBgImage: String? = null,
+        /** 日间默认封面（书封）图集组 ID，组内固定只有一张图 */
+        var dayDefaultCoverGroupId: Long? = null,
+        /** 夜间默认封面（书封）图集组 ID，组内固定只有一张图 */
+        var nightDefaultCoverGroupId: Long? = null,
+        /** 阅读排版参数；null 表示主题包未携带，应用时保持用户当前排版 */
+        var readLayout: ReadLayoutPayload? = null,
         var updatedAt: Long = System.currentTimeMillis(),
     )
 
@@ -133,6 +147,53 @@ object ApplicationThemeManager {
         val nightBottomBar: NavigationBarConfig? = null,
         val dayCover: CoverPayload? = null,
         val nightCover: CoverPayload? = null,
+        val dayDefaultCover: CoverPayload? = null,
+        val nightDefaultCover: CoverPayload? = null,
+    )
+
+    /**
+     * 阅读排版载荷。
+     *
+     * 只承载阅读页与排版直接相关的参数，全部字段可空：
+     * 导入时缺省（为 null）表示主题包没有携带该项，完全跳过、不覆盖用户现有设置。
+     * 与 [ReadBookConfig.Config] 的一一映射关系见 [applyReadBook]。
+     */
+    @Keep
+    data class ReadLayoutPayload(
+        var textSize: Int? = null,
+        var letterSpacing: Float? = null,
+        var lineSpacingExtra: Int? = null,
+        var paragraphSpacing: Int? = null,
+        var paragraphIndent: String? = null,
+        var textFont: String? = null,
+        var textBold: Int? = null,
+        var titleBold: Int? = null,
+        var titleSize: Int? = null,
+        var titleMode: Int? = null,
+        var titleTopSpacing: Int? = null,
+        var titleBottomSpacing: Int? = null,
+        var titleSplitMode: Int? = null,
+        var titleSplitValue: String? = null,
+        var titleSubScale: Float? = null,
+        var titleLineSpacingExtra: Int? = null,
+        var paddingLeft: Int? = null,
+        var paddingRight: Int? = null,
+        var paddingTop: Int? = null,
+        var paddingBottom: Int? = null,
+        var headerPaddingLeft: Int? = null,
+        var headerPaddingRight: Int? = null,
+        var headerPaddingTop: Int? = null,
+        var headerPaddingBottom: Int? = null,
+        var footerPaddingLeft: Int? = null,
+        var footerPaddingRight: Int? = null,
+        var footerPaddingTop: Int? = null,
+        var footerPaddingBottom: Int? = null,
+        var headerFontSize: Int? = null,
+        var footerFontSize: Int? = null,
+        var underlineMode: Int? = null,
+        var underlineWidth: Float? = null,
+        var underlineOffset: Float? = null,
+        var bgAlpha: Int? = null,
     )
 
     /** zip 包内封面图集的载荷数据 */
@@ -279,6 +340,15 @@ object ApplicationThemeManager {
                     nightTheme = config.nightTheme?.copy(
                         backgroundImgPath = context.getPrefString(PreferKey.bgImageN),
                     ),
+                    // 导出时自动附带启动页背景、阅读背景与阅读排版：
+                    // 配置中已有的沿用，缺失的取当前实际使用值，保证导出的包一次应用即完整
+                    daySplashImage = config.daySplashImage ?: AppConfig.welcomeImage,
+                    nightSplashImage = config.nightSplashImage ?: AppConfig.welcomeImageDark,
+                    dayReadBgImage = config.dayReadBgImage
+                        ?: ReadBookConfig.durConfig.let { if (it.bgType == 2) it.bgStr else null },
+                    nightReadBgImage = config.nightReadBgImage
+                        ?: ReadBookConfig.durConfig.let { if (it.bgTypeNight == 2) it.bgStrNight else null },
+                    readLayout = config.readLayout ?: captureReadLayout(),
                 )
             }
         if (format == ExportFormat.NATIVE) validateForApply(context, current)
@@ -302,6 +372,10 @@ object ApplicationThemeManager {
                 val packagedConfig = config.copy(
                     dayTheme = packageTheme(zip, config.dayTheme, "themes/day"),
                     nightTheme = packageTheme(zip, config.nightTheme, "themes/night"),
+                    daySplashImage = packageImage(zip, config.daySplashImage, "splash/day"),
+                    nightSplashImage = packageImage(zip, config.nightSplashImage, "splash/night"),
+                    dayReadBgImage = packageImage(zip, config.dayReadBgImage, "readbg/day"),
+                    nightReadBgImage = packageImage(zip, config.nightReadBgImage, "readbg/night"),
                 )
                 val data = PackageData(
                     config = packagedConfig,
@@ -311,6 +385,8 @@ object ApplicationThemeManager {
                     nightBottomBar = packageBottomBar(zip, context, true, config.nightBottomBarId, "bottombar/night"),
                     dayCover = packageCover(zip, config.dayCoverGroupId, "covers/day"),
                     nightCover = packageCover(zip, config.nightCoverGroupId, "covers/night"),
+                    dayDefaultCover = packageCover(zip, config.dayDefaultCoverGroupId, "defaultcover/day"),
+                    nightDefaultCover = packageCover(zip, config.nightDefaultCoverGroupId, "defaultcover/night"),
                 )
                 zip.putNextEntry(ZipEntry("application_theme.json"))
                 zip.write(GSON.toJson(data).toByteArray())
@@ -411,6 +487,8 @@ object ApplicationThemeManager {
         val nightBottom = if (importNightBottomBar) restoreBottomBar(zip, temp, true, data.nightBottomBar) else null
         val dayCover = if (importDayCover) restoreCover(zip, temp, data.dayCover) else null
         val nightCover = if (importNightCover) restoreCover(zip, temp, data.nightCover) else null
+        val dayDefaultCover = restoreCover(zip, temp, data.dayDefaultCover)
+        val nightDefaultCover = restoreCover(zip, temp, data.nightDefaultCover)
         return addImported(
             source.copy(
                 dayTheme = dayTheme,
@@ -421,6 +499,13 @@ object ApplicationThemeManager {
                 nightBottomBarId = nightBottom,
                 dayCoverGroupId = dayCover,
                 nightCoverGroupId = nightCover,
+                daySplashImage = restoreImage(zip, temp, source.daySplashImage, "splash"),
+                nightSplashImage = restoreImage(zip, temp, source.nightSplashImage, "splash"),
+                dayReadBgImage = restoreImage(zip, temp, source.dayReadBgImage, "readbg"),
+                nightReadBgImage = restoreImage(zip, temp, source.nightReadBgImage, "readbg"),
+                dayDefaultCoverGroupId = dayDefaultCover,
+                nightDefaultCoverGroupId = nightDefaultCover,
+                readLayout = source.readLayout,
             ),
         )
     }
@@ -502,6 +587,11 @@ object ApplicationThemeManager {
             nightBottomBarId = NavigationBarConfig.activeConfig(context, true).id,
             dayCoverGroupId = selectedCoverGroupId(context, false),
             nightCoverGroupId = selectedCoverGroupId(context, true),
+            daySplashImage = AppConfig.welcomeImage,
+            nightSplashImage = AppConfig.welcomeImageDark,
+            dayReadBgImage = ReadBookConfig.durConfig.let { if (it.bgType == 2) it.bgStr else null },
+            nightReadBgImage = ReadBookConfig.durConfig.let { if (it.bgTypeNight == 2) it.bgStrNight else null },
+            readLayout = captureReadLayout(),
         )
     }
 
@@ -667,6 +757,23 @@ object ApplicationThemeManager {
         // 封面图集为 null 表示「未设置」，应用时重置为默认（不使用图集），而非保持现状
         coverRepository.setSelectedGroup(false, config.dayCoverGroupId)
         coverRepository.setSelectedGroup(true, config.nightCoverGroupId)
+        // 默认封面（书封）：主题包携带时覆盖封面图集的选择，组内固定只有一张图，
+        // 因此不会出现随机封面；同时写入单张默认封面路径，保证未启用图集时同样生效。
+        config.dayDefaultCoverGroupId?.let { groupId ->
+            coverRepository.setSelectedGroup(false, groupId)
+            coverRepository.allGroupsWithImages().firstOrNull { it.group.id == groupId }
+                ?.images?.firstOrNull()?.path?.takeIf { it.isNotBlank() }
+                ?.let { context.putPrefString(PreferKey.defaultCover, it) }
+        }
+        config.nightDefaultCoverGroupId?.let { groupId ->
+            coverRepository.setSelectedGroup(true, groupId)
+            coverRepository.allGroupsWithImages().firstOrNull { it.group.id == groupId }
+                ?.images?.firstOrNull()?.path?.takeIf { it.isNotBlank() }
+                ?.let { context.putPrefString(PreferKey.defaultCoverDark, it) }
+        }
+        // 启动页背景、阅读背景与阅读排版：主题包未携带时各项保持现状
+        applyWelcome(config)
+        applyReadBook(config)
 
         if (config.dayTheme != null && context.getPrefString(PreferKey.dThemeName) != config.dayTheme?.themeName) {
             throw IllegalStateException(appCtx.getString(R.string.app_theme_day_apply_failed))
@@ -708,6 +815,112 @@ object ApplicationThemeManager {
             temp.copyTo(target, overwrite = true)
             temp.delete()
         }
+    }
+
+    /** 应用启动页背景（日/夜各一张），未携带时保持现状 */
+    private fun applyWelcome(config: Config) {
+        config.daySplashImage?.takeIf { it.isNotBlank() }?.let { AppConfig.welcomeImage = it }
+        config.nightSplashImage?.takeIf { it.isNotBlank() }?.let { AppConfig.welcomeImageDark = it }
+    }
+
+    /**
+     * 应用阅读背景与阅读排版。
+     *
+     * 只覆盖主题包实际携带的部分：排版字段逐个判断 null，
+     * 背景图仅在携带时改写 bgType/bgStr，其余阅读设置保持用户当前值。
+     */
+    private fun applyReadBook(config: Config) {
+        val layout = config.readLayout
+        val dayBg = config.dayReadBgImage?.takeIf { it.isNotBlank() }
+        val nightBg = config.nightReadBgImage?.takeIf { it.isNotBlank() }
+        if (layout == null && dayBg == null && nightBg == null) return
+        var next = ReadBookConfig.durConfig
+        if (layout != null) {
+            next = next.copy(
+                textSize = layout.textSize ?: next.textSize,
+                letterSpacing = layout.letterSpacing ?: next.letterSpacing,
+                lineSpacingExtra = layout.lineSpacingExtra ?: next.lineSpacingExtra,
+                paragraphSpacing = layout.paragraphSpacing ?: next.paragraphSpacing,
+                paragraphIndent = layout.paragraphIndent ?: next.paragraphIndent,
+                textBold = layout.textBold ?: next.textBold,
+                titleBold = layout.titleBold ?: next.titleBold,
+                titleSize = layout.titleSize ?: next.titleSize,
+                titleMode = layout.titleMode ?: next.titleMode,
+                titleTopSpacing = layout.titleTopSpacing ?: next.titleTopSpacing,
+                titleBottomSpacing = layout.titleBottomSpacing ?: next.titleBottomSpacing,
+                titleSplitMode = layout.titleSplitMode ?: next.titleSplitMode,
+                titleSplitValue = layout.titleSplitValue ?: next.titleSplitValue,
+                titleSubScale = layout.titleSubScale ?: next.titleSubScale,
+                titleLineSpacingExtra = layout.titleLineSpacingExtra ?: next.titleLineSpacingExtra,
+                paddingLeft = layout.paddingLeft ?: next.paddingLeft,
+                paddingRight = layout.paddingRight ?: next.paddingRight,
+                paddingTop = layout.paddingTop ?: next.paddingTop,
+                paddingBottom = layout.paddingBottom ?: next.paddingBottom,
+                headerPaddingLeft = layout.headerPaddingLeft ?: next.headerPaddingLeft,
+                headerPaddingRight = layout.headerPaddingRight ?: next.headerPaddingRight,
+                headerPaddingTop = layout.headerPaddingTop ?: next.headerPaddingTop,
+                headerPaddingBottom = layout.headerPaddingBottom ?: next.headerPaddingBottom,
+                footerPaddingLeft = layout.footerPaddingLeft ?: next.footerPaddingLeft,
+                footerPaddingRight = layout.footerPaddingRight ?: next.footerPaddingRight,
+                footerPaddingTop = layout.footerPaddingTop ?: next.footerPaddingTop,
+                footerPaddingBottom = layout.footerPaddingBottom ?: next.footerPaddingBottom,
+                headerFontSize = layout.headerFontSize ?: next.headerFontSize,
+                footerFontSize = layout.footerFontSize ?: next.footerFontSize,
+                underlineMode = layout.underlineMode ?: next.underlineMode,
+                underlineWidth = layout.underlineWidth ?: next.underlineWidth,
+                underlineOffset = layout.underlineOffset ?: next.underlineOffset,
+                bgAlpha = layout.bgAlpha ?: next.bgAlpha,
+            )
+            // 字体单独处理：目标字体文件不存在时保留用户原有字体，避免出现空字体
+            layout.textFont?.takeIf { it.isBlank() || File(it).isFile }
+                ?.let { next = next.copy(textFont = it) }
+        }
+        // 阅读背景：bgType 2 表示使用本地图片
+        if (dayBg != null) next = next.copy(bgType = 2, bgStr = dayBg)
+        if (nightBg != null) next = next.copy(bgTypeNight = 2, bgStrNight = nightBg)
+        ReadBookConfig.durConfig = next
+        ReadBookConfig.save()
+    }
+
+    /** 以当前阅读排版生成载荷，用于「从当前状态创建主题」时一并保存排版 */
+    private fun captureReadLayout(): ReadLayoutPayload {
+        val c = ReadBookConfig.durConfig
+        return ReadLayoutPayload(
+            textSize = c.textSize,
+            letterSpacing = c.letterSpacing,
+            lineSpacingExtra = c.lineSpacingExtra,
+            paragraphSpacing = c.paragraphSpacing,
+            paragraphIndent = c.paragraphIndent,
+            textFont = c.textFont,
+            textBold = c.textBold,
+            titleBold = c.titleBold,
+            titleSize = c.titleSize,
+            titleMode = c.titleMode,
+            titleTopSpacing = c.titleTopSpacing,
+            titleBottomSpacing = c.titleBottomSpacing,
+            titleSplitMode = c.titleSplitMode,
+            titleSplitValue = c.titleSplitValue,
+            titleSubScale = c.titleSubScale,
+            titleLineSpacingExtra = c.titleLineSpacingExtra,
+            paddingLeft = c.paddingLeft,
+            paddingRight = c.paddingRight,
+            paddingTop = c.paddingTop,
+            paddingBottom = c.paddingBottom,
+            headerPaddingLeft = c.headerPaddingLeft,
+            headerPaddingRight = c.headerPaddingRight,
+            headerPaddingTop = c.headerPaddingTop,
+            headerPaddingBottom = c.headerPaddingBottom,
+            footerPaddingLeft = c.footerPaddingLeft,
+            footerPaddingRight = c.footerPaddingRight,
+            footerPaddingTop = c.footerPaddingTop,
+            footerPaddingBottom = c.footerPaddingBottom,
+            headerFontSize = c.headerFontSize,
+            footerFontSize = c.footerFontSize,
+            underlineMode = c.underlineMode,
+            underlineWidth = c.underlineWidth,
+            underlineOffset = c.underlineOffset,
+            bgAlpha = c.bgAlpha,
+        )
     }
 
     private fun applyTopBar(context: Context, isNight: Boolean, dirName: String) {
@@ -784,6 +997,20 @@ object ApplicationThemeManager {
             File(image.path).takeIf { it.isFile }?.let { addZipFile(zip, it, "$prefix/$index") }
         }
         return CoverPayload(group.group.name, images)
+    }
+
+    /**
+     * 打包单张图片资源（启动页背景、阅读背景）。
+     *
+     * 返回 zip 内路径；网络地址原样返回；本地文件缺失时返回 null（该项不进入主题包）。
+     */
+    private fun packageImage(zip: ZipOutputStream, path: String?, basePath: String): String? {
+        if (path.isNullOrBlank()) return null
+        if (path.startsWith("http", true)) return path
+        val file = File(path).takeIf { it.isFile }
+            ?: appCtx.externalFiles.getFile(path).takeIf { it.isFile }
+            ?: return null
+        return addZipFile(zip, file, basePath)
     }
 
     private fun addZipFile(zip: ZipOutputStream, file: File, basePath: String): String {
@@ -885,6 +1112,22 @@ object ApplicationThemeManager {
         return groupId
     }
 
+    /**
+     * 从 zip 还原单张贴图（启动页背景 / 阅读背景）。
+     *
+     * 返回落盘后的绝对路径；源路径为空、为网络地址、或 zip 内没有该资源时返回 null，
+     * 表示主题包没有携带该项，应用时保持用户当前设置不变。
+     */
+    private fun restoreImage(zip: ZipFile, temp: File, packagedPath: String?, subDir: String): String? {
+        if (packagedPath.isNullOrBlank()) return null
+        if (packagedPath.startsWith("http", true)) return packagedPath
+        val extracted = extractAsset(zip, temp, packagedPath) ?: return null
+        val dir = appCtx.externalFiles.getFile(subDir).apply { mkdirs() }
+        val target = dir.getFile("application_theme_${UUID.randomUUID()}.${extracted.extension.ifBlank { "jpg" }}")
+        extracted.copyTo(target, overwrite = true)
+        return target.absolutePath
+    }
+
     internal fun extractAsset(zip: ZipFile, temp: File, path: String): File? {
         val entry = zip.getEntry(path) ?: return null
         require(!entry.isDirectory) { appCtx.getString(R.string.app_theme_invalid_asset) }
@@ -917,6 +1160,16 @@ object ApplicationThemeManager {
             listOfNotNull(data.config.dayTheme, data.config.nightTheme).forEach { theme ->
                 theme.backgroundImgPath?.takeUnless { it.startsWith("http", true) }?.let(::add)
             }
+            // 启动页背景与阅读背景：仅校验主题包实际携带的项，缺省（旧包）时不做任何要求
+            listOfNotNull(
+                data.config.daySplashImage,
+                data.config.nightSplashImage,
+                data.config.dayReadBgImage,
+                data.config.nightReadBgImage,
+            ).filterNot { it.startsWith("http", true) }.forEach(::add)
+            // 默认封面（书封）图片
+            data.dayDefaultCover?.let { addAll(it.images) }
+            data.nightDefaultCover?.let { addAll(it.images) }
             if (importDayTopBar) {
                 data.dayTopBar?.wallpaperPath?.let(::add)
             }
@@ -962,6 +1215,13 @@ object ApplicationThemeManager {
                 require(File(path).isFile) { appCtx.getString(R.string.app_theme_bg_image_missing, theme.themeName) }
             }
         }
+        // 启动页背景与阅读背景：路径必须真实存在，缺省（为 null）时不校验也不改动
+        listOfNotNull(config.daySplashImage, config.nightSplashImage, config.dayReadBgImage, config.nightReadBgImage)
+            .forEach { path ->
+                if (File(path).isAbsolute) {
+                    require(File(path).isFile) { appCtx.getString(R.string.app_theme_bg_image_missing, config.name) }
+                }
+            }
         if (config.dayTopBarDir.isNotBlank()) {
             require(TopBarConfig.loadEntries(context, false).any { it.dirName == config.dayTopBarDir }) { appCtx.getString(R.string.app_theme_day_top_bar_missing) }
         }
@@ -996,6 +1256,13 @@ object ApplicationThemeManager {
             nightBottomBarId = runCatching { source.nightBottomBarId }.getOrNull(),
             dayCoverGroupId = runCatching { source.dayCoverGroupId }.getOrNull(),
             nightCoverGroupId = runCatching { source.nightCoverGroupId }.getOrNull(),
+            daySplashImage = runCatching { source.daySplashImage }.getOrNull(),
+            nightSplashImage = runCatching { source.nightSplashImage }.getOrNull(),
+            dayReadBgImage = runCatching { source.dayReadBgImage }.getOrNull(),
+            nightReadBgImage = runCatching { source.nightReadBgImage }.getOrNull(),
+            dayDefaultCoverGroupId = runCatching { source.dayDefaultCoverGroupId }.getOrNull(),
+            nightDefaultCoverGroupId = runCatching { source.nightDefaultCoverGroupId }.getOrNull(),
+            readLayout = runCatching { source.readLayout }.getOrNull(),
             updatedAt = runCatching { source.updatedAt }.getOrDefault(System.currentTimeMillis()),
         )
     }
