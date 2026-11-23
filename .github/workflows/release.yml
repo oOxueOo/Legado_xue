@@ -14,7 +14,7 @@ jobs:
     steps:
       - id: set-ver
         run: |
-          echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
+          echo "version=3.26X1" >> $GITHUB_OUTPUT
       - id: check
         run: |
           if [ -n "${{ secrets.GITEE_TOKEN }}" ]; then
