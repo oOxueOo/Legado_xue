@@ -127,10 +127,14 @@ object ApplicationThemeManager {
         var dayReadBgImage: String? = null,
         /** 夜间阅读页背景图路径；null 表示主题包未携带，导入/应用时保持现状 */
         var nightReadBgImage: String? = null,
-        /** 日间默认封面（书封）图集组 ID，组内固定只有一张图 */
+        /** 旧版遗留：日间默认封面曾被做成图集组，仅用于兼容读取旧主题包，新流程不再写入 */
         var dayDefaultCoverGroupId: Long? = null,
-        /** 夜间默认封面（书封）图集组 ID，组内固定只有一张图 */
+        /** 旧版遗留：夜间默认封面曾被做成图集组，仅用于兼容读取旧主题包，新流程不再写入 */
         var nightDefaultCoverGroupId: Long? = null,
+        /** 日间默认封面（书封）单图路径；null 表示主题包未携带，应用时保持现状 */
+        var dayDefaultCoverImage: String? = null,
+        /** 夜间默认封面（书封）单图路径；null 表示主题包未携带，应用时保持现状 */
+        var nightDefaultCoverImage: String? = null,
         /** 阅读排版参数；null 表示主题包未携带，应用时保持用户当前排版 */
         var readLayout: ReadLayoutPayload? = null,
         var updatedAt: Long = System.currentTimeMillis(),
@@ -376,6 +380,11 @@ object ApplicationThemeManager {
                     nightSplashImage = packageImage(zip, config.nightSplashImage, "splash/night"),
                     dayReadBgImage = packageImage(zip, config.dayReadBgImage, "readbg/day"),
                     nightReadBgImage = packageImage(zip, config.nightReadBgImage, "readbg/night"),
+                    dayDefaultCoverImage = packageImage(zip, config.dayDefaultCoverImage, "defaultcover/day"),
+                    nightDefaultCoverImage = packageImage(zip, config.nightDefaultCoverImage, "defaultcover/night"),
+                    // 默认封面不再以图集组形式导出
+                    dayDefaultCoverGroupId = null,
+                    nightDefaultCoverGroupId = null,
                 )
                 val data = PackageData(
                     config = packagedConfig,
@@ -385,8 +394,6 @@ object ApplicationThemeManager {
                     nightBottomBar = packageBottomBar(zip, context, true, config.nightBottomBarId, "bottombar/night"),
                     dayCover = packageCover(zip, config.dayCoverGroupId, "covers/day"),
                     nightCover = packageCover(zip, config.nightCoverGroupId, "covers/night"),
-                    dayDefaultCover = packageCover(zip, config.dayDefaultCoverGroupId, "defaultcover/day"),
-                    nightDefaultCover = packageCover(zip, config.nightDefaultCoverGroupId, "defaultcover/night"),
                 )
                 zip.putNextEntry(ZipEntry("application_theme.json"))
                 zip.write(GSON.toJson(data).toByteArray())
@@ -487,8 +494,12 @@ object ApplicationThemeManager {
         val nightBottom = if (importNightBottomBar) restoreBottomBar(zip, temp, true, data.nightBottomBar) else null
         val dayCover = if (importDayCover) restoreCover(zip, temp, data.dayCover) else null
         val nightCover = if (importNightCover) restoreCover(zip, temp, data.nightCover) else null
-        val dayDefaultCover = restoreCover(zip, temp, data.dayDefaultCover)
-        val nightDefaultCover = restoreCover(zip, temp, data.nightDefaultCover)
+        // 默认封面（书封）只落成单图路径，不再创建/选中封面图集组；
+        // 旧主题包（带 dayDefaultCoverGroupId + 组内图）走兼容分支取首图
+        val dayDefaultCoverImage = restoreImage(zip, temp, source.dayDefaultCoverImage, "defaultcover")
+            ?: legacyDefaultCoverImage(zip, temp, source.dayDefaultCoverGroupId, data.dayDefaultCover)
+        val nightDefaultCoverImage = restoreImage(zip, temp, source.nightDefaultCoverImage, "defaultcover")
+            ?: legacyDefaultCoverImage(zip, temp, source.nightDefaultCoverGroupId, data.nightDefaultCover)
         return addImported(
             source.copy(
                 dayTheme = dayTheme,
@@ -503,8 +514,10 @@ object ApplicationThemeManager {
                 nightSplashImage = restoreImage(zip, temp, source.nightSplashImage, "splash"),
                 dayReadBgImage = restoreImage(zip, temp, source.dayReadBgImage, "readbg"),
                 nightReadBgImage = restoreImage(zip, temp, source.nightReadBgImage, "readbg"),
-                dayDefaultCoverGroupId = dayDefaultCover,
-                nightDefaultCoverGroupId = nightDefaultCover,
+                dayDefaultCoverImage = dayDefaultCoverImage,
+                nightDefaultCoverImage = nightDefaultCoverImage,
+                dayDefaultCoverGroupId = null,
+                nightDefaultCoverGroupId = null,
                 readLayout = source.readLayout,
             ),
         )
@@ -558,7 +571,11 @@ object ApplicationThemeManager {
         (config.dayBottomBarId == null || NavigationBarConfig.activeConfig(context, false).id == config.dayBottomBarId) &&
         (config.nightBottomBarId == null || NavigationBarConfig.activeConfig(context, true).id == config.nightBottomBarId) &&
         (config.dayCoverGroupId == null || selectedCoverGroupId(context, false) == config.dayCoverGroupId) &&
-        (config.nightCoverGroupId == null || selectedCoverGroupId(context, true) == config.nightCoverGroupId)
+        (config.nightCoverGroupId == null || selectedCoverGroupId(context, true) == config.nightCoverGroupId) &&
+        (config.dayDefaultCoverImage == null ||
+            context.getPrefString(PreferKey.defaultCover).orEmpty() == config.dayDefaultCoverImage) &&
+        (config.nightDefaultCoverImage == null ||
+            context.getPrefString(PreferKey.defaultCoverDark).orEmpty() == config.nightDefaultCoverImage)
 
     /** 从当前系统状态快照生成一个新配置 */
     fun captureCurrent(context: Context, name: String, id: String? = null): Config {
@@ -591,6 +608,10 @@ object ApplicationThemeManager {
             nightSplashImage = AppConfig.welcomeImageDark,
             dayReadBgImage = ReadBookConfig.durConfig.let { if (it.bgType == 2) it.bgStr else null },
             nightReadBgImage = ReadBookConfig.durConfig.let { if (it.bgTypeNight == 2) it.bgStrNight else null },
+            dayDefaultCoverImage = context.getPrefString(PreferKey.defaultCover)
+                .orEmpty().takeIf { it.isNotBlank() && File(it).isFile },
+            nightDefaultCoverImage = context.getPrefString(PreferKey.defaultCoverDark)
+                .orEmpty().takeIf { it.isNotBlank() && File(it).isFile },
             readLayout = captureReadLayout(),
         )
     }
@@ -757,20 +778,9 @@ object ApplicationThemeManager {
         // 封面图集为 null 表示「未设置」，应用时重置为默认（不使用图集），而非保持现状
         coverRepository.setSelectedGroup(false, config.dayCoverGroupId)
         coverRepository.setSelectedGroup(true, config.nightCoverGroupId)
-        // 默认封面（书封）：主题包携带时覆盖封面图集的选择，组内固定只有一张图，
-        // 因此不会出现随机封面；同时写入单张默认封面路径，保证未启用图集时同样生效。
-        config.dayDefaultCoverGroupId?.let { groupId ->
-            coverRepository.setSelectedGroup(false, groupId)
-            coverRepository.allGroupsWithImages().firstOrNull { it.group.id == groupId }
-                ?.images?.firstOrNull()?.path?.takeIf { it.isNotBlank() }
-                ?.let { context.putPrefString(PreferKey.defaultCover, it) }
-        }
-        config.nightDefaultCoverGroupId?.let { groupId ->
-            coverRepository.setSelectedGroup(true, groupId)
-            coverRepository.allGroupsWithImages().firstOrNull { it.group.id == groupId }
-                ?.images?.firstOrNull()?.path?.takeIf { it.isNotBlank() }
-                ?.let { context.putPrefString(PreferKey.defaultCoverDark, it) }
-        }
+        // 默认封面（书封）：只写单图偏好，不建图集组、不改图集选中，避免占用「封面图集」入口
+        config.dayDefaultCoverImage?.takeIf { it.isNotBlank() }?.let { context.putPrefString(PreferKey.defaultCover, it) }
+        config.nightDefaultCoverImage?.takeIf { it.isNotBlank() }?.let { context.putPrefString(PreferKey.defaultCoverDark, it) }
         // 启动页背景、阅读背景与阅读排版：主题包未携带时各项保持现状
         applyWelcome(config)
         applyReadBook(config)
@@ -1113,7 +1123,22 @@ object ApplicationThemeManager {
     }
 
     /**
-     * 从 zip 还原单张贴图（启动页背景 / 阅读背景）。
+     * 兼容旧主题包：旧版把默认封面打成图集组（[CoverPayload]），
+     * 这里取组内首图落盘成单图路径，不再创建图集组。
+     */
+    private fun legacyDefaultCoverImage(
+        zip: ZipFile,
+        temp: File,
+        legacyGroupId: Long?,
+        payload: CoverPayload?,
+    ): String? {
+        if (legacyGroupId == null) return null
+        val first = payload?.images?.firstOrNull() ?: return null
+        return restoreImage(zip, temp, first, "defaultcover")
+    }
+
+    /**
+     * 从 zip 还原单张贴图（启动页背景 / 阅读背景 / 默认封面）。
      *
      * 返回落盘后的绝对路径；源路径为空、为网络地址、或 zip 内没有该资源时返回 null，
      * 表示主题包没有携带该项，应用时保持用户当前设置不变。
@@ -1167,7 +1192,9 @@ object ApplicationThemeManager {
                 data.config.dayReadBgImage,
                 data.config.nightReadBgImage,
             ).filterNot { it.startsWith("http", true) }.forEach(::add)
-            // 默认封面（书封）图片
+            // 默认封面（书封）：新格式为单图路径，旧格式为图集组载荷（兼容读取）
+            listOfNotNull(data.config.dayDefaultCoverImage, data.config.nightDefaultCoverImage)
+                .filterNot { it.startsWith("http", true) }.forEach(::add)
             data.dayDefaultCover?.let { addAll(it.images) }
             data.nightDefaultCover?.let { addAll(it.images) }
             if (importDayTopBar) {
@@ -1215,9 +1242,15 @@ object ApplicationThemeManager {
                 require(File(path).isFile) { appCtx.getString(R.string.app_theme_bg_image_missing, theme.themeName) }
             }
         }
-        // 启动页背景与阅读背景：路径必须真实存在，缺省（为 null）时不校验也不改动
-        listOfNotNull(config.daySplashImage, config.nightSplashImage, config.dayReadBgImage, config.nightReadBgImage)
-            .forEach { path ->
+        // 启动页背景、阅读背景与默认封面：路径必须真实存在，缺省（为 null）时不校验也不改动
+        listOfNotNull(
+            config.daySplashImage,
+            config.nightSplashImage,
+            config.dayReadBgImage,
+            config.nightReadBgImage,
+            config.dayDefaultCoverImage,
+            config.nightDefaultCoverImage,
+        ).forEach { path ->
                 if (File(path).isAbsolute) {
                     require(File(path).isFile) { appCtx.getString(R.string.app_theme_bg_image_missing, config.name) }
                 }
@@ -1262,6 +1295,8 @@ object ApplicationThemeManager {
             nightReadBgImage = runCatching { source.nightReadBgImage }.getOrNull(),
             dayDefaultCoverGroupId = runCatching { source.dayDefaultCoverGroupId }.getOrNull(),
             nightDefaultCoverGroupId = runCatching { source.nightDefaultCoverGroupId }.getOrNull(),
+            dayDefaultCoverImage = runCatching { source.dayDefaultCoverImage }.getOrNull(),
+            nightDefaultCoverImage = runCatching { source.nightDefaultCoverImage }.getOrNull(),
             readLayout = runCatching { source.readLayout }.getOrNull(),
             updatedAt = runCatching { source.updatedAt }.getOrDefault(System.currentTimeMillis()),
         )
