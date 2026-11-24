@@ -23,6 +23,9 @@ abstract class PreferenceFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
         listView.clipToPadding = false
         listView.applyNavigationBarPadding()
+        // 首块卡片与顶栏拉开 8dp，和「我的」页 panelTopPadding 一致
+        val topPadding = (8 * resources.displayMetrics.density).toInt()
+        listView.setPadding(0, topPadding, 0, listView.paddingBottom)
         // 分组卡片底衬：与「我的」页同款半透明圆角卡片，按分组整块绘制
         listView.applySettingsCard()
     }

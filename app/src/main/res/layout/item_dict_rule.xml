@@ -6,8 +6,8 @@
     android:minHeight="60dp"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingEnd="16dp"
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp"
     android:paddingTop="10dp"
     android:paddingBottom="10dp">
 

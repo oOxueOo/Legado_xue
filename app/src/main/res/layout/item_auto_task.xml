@@ -9,8 +9,8 @@
     android:gravity="center"
     android:orientation="horizontal"
     android:padding="10dp"
-    android:paddingStart="16dp"
-    android:paddingEnd="16dp">
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp">
 
     <io.legado.app.lib.theme.view.ThemeCheckBox
         android:id="@+id/cb_name"

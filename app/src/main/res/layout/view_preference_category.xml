@@ -9,19 +9,19 @@
     <View
         android:id="@+id/preference_divider_above"
         android:layout_width="match_parent"
-        android:layout_height="8dp" />
+        android:layout_height="10dp" />
 
     <TextView
         android:id="@+id/preference_title"
-        android:paddingTop="16dp"
-        android:paddingBottom="8dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="6dp"
         android:background="@drawable/bg_prefs_color"
         android:paddingLeft="28dp"
         android:paddingRight="16dp"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="@color/accent"
+        android:textColor="@color/tv_text_summary"
         tools:ignore="RtlHardcoded,RtlSymmetry" />
 
     <View

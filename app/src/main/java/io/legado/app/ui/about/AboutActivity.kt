@@ -2,19 +2,15 @@ package io.legado.app.ui.about
 
 import android.os.Bundle
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,8 +33,11 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.FragmentManager
 import io.legado.app.R
 import io.legado.app.base.BaseComposeActivity
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.settings.AppSettingsPanel
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.share
 
@@ -103,13 +102,14 @@ private fun AboutScreen(
                 AboutHeader(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 0.dp)
                 )
                 AboutPreferenceHost(
                     fragmentManager = fragmentManager,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .padding(top = AppDimens.panelSpacing)
                 )
             }
         }
@@ -136,30 +136,27 @@ private fun AboutHeader(modifier: Modifier = Modifier) {
         }
     }
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
-        )
-    ) {
+    AppSettingsPanel(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(PaddingValues(horizontal = 10.dp, vertical = 10.dp)),
+                .padding(
+                    horizontal = AppDimens.panelRowHorizontalPadding,
+                    vertical = 10.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = stringResource(R.string.app_name_sigma),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.size(8.dp))
+            Spacer(modifier = Modifier.size(6.dp))
             Text(
                 text = summaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.bodySmall,
+                color = pageSecondaryTextColor()
             )
         }
     }
