@@ -32,6 +32,7 @@ import io.legado.app.lib.theme.eInkGrayscale
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.widget.recycler.VerticalDivider
@@ -69,6 +70,8 @@ class ChangeChapterSourceDialog() :
 
     private val binding by viewBinding(DialogChapterChangeSourceBinding::bind)
     private val groups = linkedSetOf<String>()
+    /** 当前勾选的分组，与搜索页搜索范围保持一致（多选） */
+    private val selectedGroups = linkedSetOf<String>()
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeChapterSourceViewModel by viewModels()
     private val editSourceResult =
@@ -87,15 +90,16 @@ class ChangeChapterSourceDialog() :
         dismissAllowingStateLoss()
     }
     private var searchBook: SearchBook? = null
-    private val searchFinishCallback: (isEmpty: Boolean) -> Unit = {
-        if (it) {
-            val searchGroup = AppConfig.searchGroup
-            if (searchGroup.isNotEmpty()) {
+    private val searchFinishCallback: (isEmpty: Boolean) -> Unit = { isEmpty ->
+        if (isEmpty) {
+            val scopeText = AppConfig.searchScope
+            if (scopeText.isNotEmpty()) {
                 lifecycleScope.launch {
                     context?.alert("搜索结果为空") {
-                        setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
+                        setMessage("${SearchScope(scopeText).display} 搜索结果为空,是否切换到全部书源")
                         noButton()
                         yesButton {
+                            AppConfig.searchScope = ""
                             AppConfig.searchGroup = ""
                             upGroupMenu()
                             viewModel.startSearch()
@@ -274,19 +278,14 @@ class ChangeChapterSourceDialog() :
 
             R.id.menu_start_stop -> viewModel.startOrStopSearch()
             R.id.menu_source_manage -> startActivity<BookSourceActivity>()
-            else -> if (item?.groupId == R.id.source_group && !item.isChecked) {
-                item.isChecked = true
-                if (item.title.toString() == getString(R.string.all_source)) {
-                    AppConfig.searchGroup = ""
-                } else {
-                    AppConfig.searchGroup = item.title.toString()
+            else -> if (item?.groupId == R.id.source_group) {
+                val groupTitle = item.title.toString()
+                if (groupTitle == getString(R.string.all_source)) {
+                    selectedGroups.clear()
+                } else if (!selectedGroups.remove(groupTitle)) {
+                    selectedGroups.add(groupTitle)
                 }
-                lifecycleScope.launch(IO) {
-                    viewModel.stopSearch()
-                    if (viewModel.refresh()) {
-                        viewModel.startSearch()
-                    }
-                }
+                applyScope()
             }
         }
         return false
@@ -368,26 +367,63 @@ class ChangeChapterSourceDialog() :
     }
 
     /**
-     * 更新分组菜单
+     * 应用当前勾选的分组：写回搜索范围，并按新范围重新搜索
+     */
+    private fun applyScope() {
+        if (selectedGroups.isEmpty()) {
+            AppConfig.searchScope = ""
+            AppConfig.searchGroup = ""
+        } else {
+            AppConfig.searchScope = selectedGroups.joinToString(",")
+            AppConfig.searchGroup = if (selectedGroups.size == 1) selectedGroups.first() else ""
+        }
+        syncGroupMenuChecked()
+        lifecycleScope.launch(IO) {
+            viewModel.stopSearch()
+            viewModel.startSearch()
+        }
+    }
+
+    /**
+     * 只同步勾选状态，不重建菜单（避免菜单展开时被修改）
+     */
+    private fun syncGroupMenuChecked() {
+        binding.toolBar.menu.findItem(R.id.menu_group)?.subMenu?.let { menu ->
+            for (i in 0 until menu.size()) {
+                val menuItem = menu.getItem(i)
+                if (menuItem.groupId != R.id.source_group) continue
+                val groupTitle = menuItem.title?.toString() ?: continue
+                menuItem.isChecked = if (groupTitle == getString(R.string.all_source)) {
+                    selectedGroups.isEmpty()
+                } else {
+                    selectedGroups.contains(groupTitle)
+                }
+            }
+        }
+    }
+
+    /**
+     * 更新分组菜单（多选，勾选状态与搜索页搜索范围保持同步）
      */
     private fun upGroupMenu() {
         binding.toolBar.menu.findItem(R.id.menu_group)?.subMenu?.transaction { menu ->
-            val selectedGroup = AppConfig.searchGroup
+            val scopeNames = SearchScope(AppConfig.searchScope).displayNames
             menu.removeGroup(R.id.source_group)
             val allItem = menu.add(R.id.source_group, Menu.NONE, Menu.NONE, R.string.all_source)
-            var hasSelectedGroup = false
+            selectedGroups.clear()
             groups.forEach { group ->
                 // 分组名是用户自定义的（可能带表情符号），框架自开的菜单窗口挂不了整层灰阶（§7.10）；
                 // 勾选仍按 String 比较，别拿菜单标题比
                 menu.add(R.id.source_group, Menu.NONE, Menu.NONE, group.eInkGrayscale())?.let {
-                    if (group == selectedGroup) {
+                    if (scopeNames.contains(group)) {
                         it.isChecked = true
-                        hasSelectedGroup = true
+                        selectedGroups.add(group)
                     }
                 }
             }
-            menu.setGroupCheckable(R.id.source_group, true, true)
-            if (!hasSelectedGroup) {
+            // 多选：第三参数 false
+            menu.setGroupCheckable(R.id.source_group, true, false)
+            if (selectedGroups.isEmpty()) {
                 allItem.isChecked = true
             }
         }

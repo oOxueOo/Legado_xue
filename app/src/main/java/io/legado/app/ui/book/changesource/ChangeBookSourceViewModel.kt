@@ -25,6 +25,7 @@ import io.legado.app.help.config.SourceConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.utils.internString
 import io.legado.app.utils.mapParallel
 import io.legado.app.utils.mapParallelSafe
@@ -193,17 +194,13 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             bookMap.clear()
             tocMapChapterCount = 0
             _changeSourceProgress.value = 0 to ""
-            val searchGroup = AppConfig.searchGroup
-            if (searchGroup.isBlank()) {
+            // 换源搜索范围与搜索页保持一致：直接读 searchScope（支持多分组、多书源、全部）
+            val scope = SearchScope(AppConfig.searchScope)
+            val scopeParts = scope.getBookSourceParts()
+            if (scopeParts.isEmpty()) {
                 bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
             } else {
-                val sources = appDb.bookSourceDao.getEnabledPartByGroup(searchGroup)
-                if (sources.isEmpty()) {
-                    AppConfig.searchGroup = ""
-                    bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
-                } else {
-                    bookSourceParts.addAll(sources)
-                }
+                bookSourceParts.addAll(scopeParts)
             }
             initSearchPool()
             search()
