@@ -394,7 +394,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     private fun getDbSearchBooks(): List<SearchBook> {
-        return if (screenKey.isEmpty()) {
+        val raw = if (screenKey.isEmpty()) {
             if (AppConfig.changeSourceCheckAuthor) {
                 appDb.searchBookDao.changeSourceByGroup(
                     name, author, AppConfig.searchGroup
@@ -415,6 +415,14 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
                 )
             }
         }
+        // 换源缓存也要跟搜索范围一致：多分组时 searchGroup 为空，DAO 会返回全库缓存，
+        // 这里按 scope 解析出的书源再过滤一遍，避免一打开就显示全库结果
+        val scope = SearchScope(AppConfig.searchScope)
+        if (scope.isAll()) return raw
+        val parts = scope.getBookSourceParts()
+        if (parts.isEmpty()) return raw
+        val urls = parts.map { it.bookSourceUrl }.toHashSet()
+        return raw.filter { it.origin in urls }
     }
 
     /**
