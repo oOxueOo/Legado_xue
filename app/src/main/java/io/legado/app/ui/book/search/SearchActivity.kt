@@ -172,26 +172,21 @@ class SearchActivity :
             menu.removeGroup(R.id.menu_group_2)
             menu.removeItem(ID_MENU_MORE)
             var hasChecked = false
+            // 多书源模式下先校验一遍：重新导入书源后旧的书源引用会失效，
+            // 这里顺手剔除，避免菜单一直显示一批搜不到的书源
+            if (viewModel.searchScope.isSource()) {
+                viewModel.searchScope.getBookSourceParts()
+            }
             val searchScopeNames = viewModel.searchScope.displayNames
             if (viewModel.searchScope.isSource()) {
-                // 多书源模式下为每个书源添加菜单项，超过5个时折叠显示
-                val maxShow = 5
-                searchScopeNames.take(maxShow).forEach { name ->
-                    // 书源名 / 分组名是用户自定义的（可能带表情符号），这个菜单是 AppCompat
-                    // 自己开的窗口，挂不了整层灰阶，只能把标题本身按灰阶绘制（§7.10）
-                    menu.add(R.id.menu_group_1, Menu.NONE, Menu.NONE, name.eInkGrayscale()).apply {
-                        isChecked = true
-                    }
-                }
-                if (searchScopeNames.size > maxShow) {
-                    menu.add(
-                        Menu.NONE,
-                        ID_MENU_MORE,
-                        Menu.NONE,
-                        "...+${searchScopeNames.size - maxShow}",
-                    ).apply {
-                        isEnabled = false
-                    }
+                // 多书源模式：只显示一条"自定义书源(N)"，不再逐个列出书目（列表过长且多是失效残留）
+                menu.add(
+                    R.id.menu_group_1,
+                    Menu.NONE,
+                    Menu.NONE,
+                    getString(R.string.custom_source_scope, searchScopeNames.size).eInkGrayscale(),
+                ).apply {
+                    isChecked = true
                 }
                 hasChecked = true
             } else {
@@ -262,7 +257,13 @@ class SearchActivity :
             R.id.menu_1 -> viewModel.searchScope.update("")
             else -> {
                 if (item.groupId == R.id.menu_group_1) {
-                    viewModel.searchScope.remove(item.title.toString())
+                    // "自定义书源(N)"点击即放弃这批书源，回到全部分组
+                    val title = item.title.toString()
+                    if (title.startsWith(getString(R.string.custom_source_scope, 0).substringBefore("("))) {
+                        viewModel.searchScope.update("")
+                    } else {
+                        viewModel.searchScope.remove(title)
+                    }
                 } else if (item.groupId == R.id.menu_group_2) {
                     viewModel.searchScope.update(item.title.toString())
                 }

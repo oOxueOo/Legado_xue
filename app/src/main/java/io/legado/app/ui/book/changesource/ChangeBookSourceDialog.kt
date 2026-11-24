@@ -460,10 +460,24 @@ class ChangeBookSourceDialog() :
     private fun upGroupMenu() {
         binding.toolBar.menu.findItem(R.id.menu_group)?.run {
             subMenu?.transaction { menu ->
-                val scopeNames = SearchScope(AppConfig.searchScope).displayNames
+                val scope = SearchScope(AppConfig.searchScope)
+                val scopeNames = scope.displayNames
                 menu.removeGroup(R.id.source_group)
                 val allItem = menu.add(R.id.source_group, Menu.NONE, Menu.NONE, R.string.all_source)
                 selectedGroups.clear()
+                val customItem = if (scope.isSource()) {
+                    // 搜索页按"具体书源"搜索时，如实显示这批书源的数量，
+                    // 不再假装勾着"全部书源"（否则用户会以为换源范围被放大了）
+                    menu.add(
+                        R.id.source_group,
+                        Menu.NONE,
+                        Menu.NONE,
+                        getString(R.string.custom_source_scope, scopeNames.size).eInkGrayscale(),
+                    )?.apply {
+                        isChecked = true
+                        isEnabled = false
+                    }
+                } else null
                 groups.forEach { group ->
                     // 分组名是用户自定义的（可能带表情符号），框架自开的菜单窗口挂不了整层灰阶（§7.10）；
                     // 勾选仍按 String 比较，别拿菜单标题比
@@ -476,11 +490,16 @@ class ChangeBookSourceDialog() :
                 }
                 // 多选：第三参数 false
                 menu.setGroupCheckable(R.id.source_group, true, false)
-                if (selectedGroups.isEmpty()) {
-                    allItem.isChecked = true
-                    title = getString(R.string.group)
-                } else {
-                    title = getString(R.string.group) + "(" + selectedGroups.size + ")"
+                when {
+                    customItem != null -> {
+                        allItem.isChecked = false
+                        title = getString(R.string.custom_source_scope, scopeNames.size)
+                    }
+                    selectedGroups.isEmpty() -> {
+                        allItem.isChecked = true
+                        title = getString(R.string.group)
+                    }
+                    else -> title = getString(R.string.group) + "(" + selectedGroups.size + ")"
                 }
             }
         }

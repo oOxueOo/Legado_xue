@@ -123,12 +123,21 @@ data class SearchScope(private var scope: String) {
             list.addAll(appDb.bookSourceDao.allEnabledPart)
         } else {
             if (scope.contains("::")) {
-                scope.split(";;").forEach { sourceScope ->
+                // 多书源模式：书源可能已被删除或换了 URL（重新导入书源后常见），
+                // 这里剔除失效条目并回写，避免菜单显示一堆搜不到的书源名
+                val parts = scope.split(";;")
+                val validParts = arrayListOf<String>()
+                parts.forEach { sourceScope ->
                     sourceScope.substringAfter("::").let { url ->
                         appDb.bookSourceDao.getBookSourcePart(url)?.let { source ->
                             list.add(source)
+                            validParts.add(sourceScope)
                         }
                     }
+                }
+                if (validParts.size != parts.size) {
+                    update(validParts.joinToString(";;"))
+                    stateLiveData.postValue(scope)
                 }
             } else {
                 val oldScope = scope.splitNotBlank(",")
