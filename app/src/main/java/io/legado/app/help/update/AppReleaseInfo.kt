@@ -45,8 +45,23 @@ fun appVariantFromAssetName(name: String, preRelease: Boolean = false): AppVaria
     }
 }
 
+/** 版本号：主版本 + 可选的自建序号，例如 `3.26X7` */
+private val versionNameRegex = Regex("""(\d+(?:\.\d+)*)(?:[Xx](\d+))?""")
+
 private fun extractVersionName(name: String): String {
-    return Regex("""\d+(?:\.\d+)+""").find(name)?.value.orEmpty()
+    val match = versionNameRegex.find(name) ?: return ""
+    val base = match.groupValues[1]
+    val serial = match.groupValues[2]
+    return if (serial.isBlank()) base else "${base}X$serial"
+}
+
+/** 把 `3.26X7` 拆成 "3.26" 与 7；没有 X 序号时视为 0 */
+private fun splitVersionSerial(version: String): Pair<String, Long> {
+    val serialIndex = version.indexOf('X')
+    if (serialIndex < 0) return version to 0L
+    val base = version.substring(0, serialIndex)
+    val serial = version.substring(serialIndex + 1).toLongOrNull() ?: 0L
+    return base to serial
 }
 
 private fun compareVersionName(remoteVersionName: String, currentVersionName: String): Int {
@@ -58,13 +73,21 @@ private fun compareVersionName(remoteVersionName: String, currentVersionName: St
     if (remoteVersion == currentVersion) {
         return 0
     }
+    val (remoteBase, remoteSerial) = splitVersionSerial(remoteVersion)
+    val (currentBase, currentSerial) = splitVersionSerial(currentVersion)
+    val baseCompare = compareBaseVersion(remoteBase, currentBase)
+    return if (baseCompare != 0) baseCompare else remoteSerial.compareTo(currentSerial)
+}
+
+private fun compareBaseVersion(remoteVersion: String, currentVersion: String): Int {
     val remoteParts = remoteVersion.split(".")
     val currentParts = currentVersion.split(".")
     val maxSize = maxOf(remoteParts.size, currentParts.size)
     for (index in 0 until maxSize) {
-        val remotePart = remoteParts.getOrElse(index) { "0" }
-        val currentPart = currentParts.getOrElse(index) { "0" }
-        val compare = comparePart(remotePart, currentPart)
+        val compare = comparePart(
+            remoteParts.getOrElse(index) { "0" },
+            currentParts.getOrElse(index) { "0" }
+        )
         if (compare != 0) {
             return compare
         }

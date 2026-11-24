@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import androidx.core.graphics.ColorUtils
-import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroupAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -23,7 +22,7 @@ import io.legado.app.lib.theme.UiCorner
  *
  * 取色与「我的」页同源（surfaceVariant + 60% 透明度），圆角取同一条 ui_panel_radius。
  */
-class SettingsCardDecoration(private val context: Context) : RecyclerView.ItemDecoration() {
+class SettingsCardDecoration(context: Context) : RecyclerView.ItemDecoration() {
 
     private val density = context.resources.displayMetrics.density
     private val inset = 12f * density
@@ -40,10 +39,20 @@ class SettingsCardDecoration(private val context: Context) : RecyclerView.ItemDe
 
         val firstTop = firstContentTop(parent, adapter)
         val bottom = parent.height - parent.paddingBottom
-        val top = if (parent.canScrollVertically(-1) || firstTop < 0f) 0f else firstTop
+        val top = if (parent.canScrollVertically(-1)) {
+            0f
+        } else {
+            if (firstTop < 0f) return
+            firstTop
+        }
         if (bottom <= top) return
 
-        rect.set(inset, top, parent.width - inset, bottom.toFloat())
+        rect.set(
+            parent.paddingLeft + inset,
+            top,
+            parent.width - parent.paddingRight - inset,
+            bottom.toFloat()
+        )
         c.drawRoundRect(rect, radius, radius, fillPaint)
     }
 
