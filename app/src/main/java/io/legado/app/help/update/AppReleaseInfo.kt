@@ -172,7 +172,22 @@ data class Asset(
 
         val appVariant = appVariantFromAssetName(name, preRelease)
 
-        return AppReleaseInfo(appVariant, timestamp, note, name, apkUrl, url)
+        return AppReleaseInfo(appVariant, timestamp, note, name, mirrorUrl(apkUrl), url)
+    }
+}
+
+/**
+ * GitHub 发布包直链在国内经常连不上（表现为 App 内「下载失败」），统一改成走镜像前缀；
+ * 镜像返回 302 跳回真实文件，下载端会跟随重定向。
+ */
+private const val GITHUB_MIRROR = "https://gh-proxy.com/"
+
+private fun mirrorUrl(raw: String): String {
+    if (raw.startsWith(GITHUB_MIRROR)) return raw
+    return if (raw.contains("github.com") || raw.contains("githubusercontent.com")) {
+        GITHUB_MIRROR + raw
+    } else {
+        raw
     }
 }
 

@@ -33,6 +33,9 @@
 
 **2026/11/24**
 
+- feat(icon): 默认图标换为「玄墨·青蓝」——魏碑「阅读」+ Read X 徽标 + 摊开的书页（封面/书页/书签三层），含自适应前后景、monochrome 与 legacy 各密度 ｜3.26X9
+- fix(settings): 「其它设置」页分组标题贴卡片顶部——分类项顶部 10dp 占位在 allowDividerAbove=false 时被隐藏却仍按占位排布，现改为恒显示且透明，标题到卡片顶恒 12dp ｜3.26X9
+- fix(update): 应用内检查更新的安装包链接改走 gh-proxy 镜像，修复国内直连 GitHub Releases 下载失败 ｜3.26X9
 - feat(ui): 一、二级页面统一视觉——透明页底 + 半透明圆角面板（surfaceVariant 70% 填充 + 1dp outlineVariant 描边 + 同源圆角），行高 60dp、左右 16dp／上下 10dp、标题 16sp + 副标题 12sp 次级色、组内 1dp 行分隔线，行首图标保留原样；Compose 页与 XML 列表页共用同一套取色 ｜3.26X7
 - feat(settings): 设置页二、三级菜单加卡片底衬，填充、描边、圆角与「我的」页同源 ｜3.26X6
 - feat(update): 检查更新改指本仓库 Releases，版本号按「3.26X+序号」比较 ｜3.26X6
