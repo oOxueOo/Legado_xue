@@ -17,12 +17,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # 版本号规则：X<主版本>.<构建序号>，例如 X1.0；每次打包从已有 tag 里取最大序号 +1
+          # 主版本允许手动升（推一个 X2.0 的 tag 后，后续自动从 X2.1 续）
           prev=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
-            | jq -r '.[].tag_name' | grep -E '^(beta-)?3\.26X[0-9]+$' | sed -E 's/^.*X//' | sort -n | tail -n 1 || true)
-          n=$(( ${prev:-0} + 1 ))
-          echo "version=3.26X$n" >> $GITHUB_OUTPUT
-          echo "已确定版本号 3.26X$n（上一版 ${prev:-无}）"
+            | jq -r '.[].tag_name' | sed -E 's/^beta-//' \
+            | grep -E '^[Xx][0-9]+\.[0-9]+$' | sed -E 's/^[Xx]//' | sort -V | tail -n 1 || true)
+          if [ -z "$prev" ]; then
+            version="X1.0"
+            echo "已确定版本号 $version（首个代号版本）"
+          else
+            version="X${prev%%.*}.$(( ${prev##*.} + 1 ))"
+            echo "已确定版本号 $version（上一版 X$prev）"
+          fi
+          echo "version=$version" >> $GITHUB_OUTPUT
       - id: check
         run: |
           if [ -n "${{ secrets.GITEE_TOKEN }}" ]; then

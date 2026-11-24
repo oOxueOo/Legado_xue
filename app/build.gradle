@@ -69,16 +69,14 @@ def lintResolveScope = {
     return [needsFull, reason, true]
 }
 
-static def releaseTime() {
-    return new Date().format("yy.MMddHH", TimeZone.getTimeZone("GMT+8"))
-}
-
 static def releaseCode() {
     return new Date().format("yyDDDHHmm", TimeZone.getTimeZone("GMT+8")).toInteger()
 }
 
 def name = "legado"
-def version = "3." + releaseTime()
+// 版本号规则：X<主版本>.<构建序号>（X1.0 起，构建时自动递增）。
+// CI 打包会把下面这一行整行替换为当次发布号，本地构建保留这个占位值。
+def version = "X1.0"
 def gitCommits = 0
 def bundledReleaseStoreFile = rootProject.file(".github/workflows/legado.jks")
 def resolvedReleaseStoreFile = project.findProperty("RELEASE_STORE_FILE") ? file(project.property("RELEASE_STORE_FILE")) : (bundledReleaseStoreFile.exists() ? bundledReleaseStoreFile : null)

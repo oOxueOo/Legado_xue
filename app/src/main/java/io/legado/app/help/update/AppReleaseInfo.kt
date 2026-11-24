@@ -11,10 +11,13 @@ data class AppReleaseInfo(
     val note: String,
     val name: String,
     val downloadUrl: String,
-    val assetUrl: String
+    val assetUrl: String,
+    /** Release 的 tag，安装包名里解析不出版本号时用它兜底 */
+    val tagName: String = ""
 ) {
     val versionName: String by lazy {
-        extractVersionName(name)
+        // tag 最可信（每次发版都带版本号）；取不到再退回安装包名
+        extractVersionName(tagName).ifBlank { extractVersionName(name) }
     }
 
     fun isNewerThan(currentVersionName: String): Boolean {
@@ -45,12 +48,29 @@ fun appVariantFromAssetName(name: String, preRelease: Boolean = false): AppVaria
     }
 }
 
-/** 版本号：主版本 + 可选的自建序号，例如 `3.26X7` */
-private val versionNameRegex = Regex("""(\d+(?:\.\d+)*)(?:[Xx](\d+))?""")
+/**
+ * 新代号版本号：`X<主版本>.<构建序号>`，例如 `X1.0`；安装包名里同样带这一段
+ */
+private val xueVersionRegex = Regex("""[Xx](\d+)\.(\d+)""")
+
+/** 旧格式版本号：主版本 + 可选的自建序号，例如 `3.26X7`、日期式 `3.26.112314` */
+private val legacyVersionRegex = Regex("""(\d+(?:\.\d+)*)(?:[Xx](\d+))?""")
+
+private data class XueVersion(val major: Long, val serial: Long)
+
+private fun parseXueVersion(text: String): XueVersion? {
+    val match = xueVersionRegex.find(text) ?: return null
+    val major = match.groupValues[1].toLongOrNull() ?: return null
+    val serial = match.groupValues[2].toLongOrNull() ?: return null
+    return XueVersion(major, serial)
+}
 
 private fun extractVersionName(name: String): String {
-    val match = versionNameRegex.find(name) ?: return ""
+    parseXueVersion(name)?.let { return "X${it.major}.${it.serial}" }
+    val match = legacyVersionRegex.find(name) ?: return ""
     val base = match.groupValues[1]
+    // 安装包名里夹着 arm64-v8a 这类数字，没带点的不当成版本号
+    if (!base.contains('.')) return ""
     val serial = match.groupValues[2]
     return if (serial.isBlank()) base else "${base}X$serial"
 }
@@ -65,6 +85,15 @@ private fun splitVersionSerial(version: String): Pair<String, Long> {
 }
 
 private fun compareVersionName(remoteVersionName: String, currentVersionName: String): Int {
+    val remoteXue = parseXueVersion(remoteVersionName)
+    val currentXue = parseXueVersion(currentVersionName)
+    if (remoteXue != null || currentXue != null) {
+        // 新代号 X1.0 起一律比旧的 3.26X / 日期式更新，切代时旧安装包也能收到首次更新提示
+        if (remoteXue == null) return -1
+        if (currentXue == null) return 1
+        val majorCompare = remoteXue.major.compareTo(currentXue.major)
+        return if (majorCompare != 0) majorCompare else remoteXue.serial.compareTo(currentXue.serial)
+    }
     val remoteVersion = extractVersionName(remoteVersionName)
     val currentVersion = extractVersionName(currentVersionName)
     if (remoteVersion.isBlank() || currentVersion.isBlank()) {
@@ -125,12 +154,14 @@ data class GithubRelease(
     val body: String,
     @SerializedName("prerelease")
     val isPreRelease: Boolean,
+    @SerializedName("tag_name")
+    val tagName: String? = null,
 ) {
     fun gitReleaseToAppReleaseInfo(): List<AppReleaseInfo> {
         assets ?: throw NoStackTraceException("获取新版本出错")
         return assets
             .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(isPreRelease, body) }
+            .map { it.assetToAppReleaseInfo(isPreRelease, body, tagName.orEmpty()) }
     }
 }
 @Keep
@@ -166,13 +197,13 @@ data class Asset(
     val isValid: Boolean
         get() = (contentType == "application/vnd.android.package-archive") && (state == "uploaded")
 
-    fun assetToAppReleaseInfo(preRelease: Boolean, note: String): AppReleaseInfo {
+    fun assetToAppReleaseInfo(preRelease: Boolean, note: String, tag: String = ""): AppReleaseInfo {
         val instant = Instant.parse(createdAt)
         val timestamp: Long = instant.toEpochMilli()
 
         val appVariant = appVariantFromAssetName(name, preRelease)
 
-        return AppReleaseInfo(appVariant, timestamp, note, name, mirrorUrl(apkUrl), url)
+        return AppReleaseInfo(appVariant, timestamp, note, name, mirrorUrl(apkUrl), url, tag)
     }
 }
 

@@ -1564,7 +1564,7 @@
     <string name="local_network_permission_rationale">Android 17 起限制了本機網絡存取，授予「附近的裝置」權限後其他裝置才能連接 Web 服務</string>
     <string name="local_network_permission_denied">未授予本機網絡權限，Web 服務已停止</string>
     <string name="welcome_show_time">歡迎頁顯示時間</string>
-    <string name="welcome_show_time_summary">設為 0 則不顯示歡迎頁</string>
+    <string name="welcome_show_time_summary">選「不顯示」則跳過歡迎頁</string>
     <string name="content_query">內容查詢</string>
     <string name="switch_rule">切換</string>
     <string name="source_content_query">源內容查詢</string>

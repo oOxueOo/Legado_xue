@@ -108,11 +108,7 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
 
 }
 
+/* 桌面图标入口：每个图标一个空壳 Activity，清单里各自挂一个 LAUNCHER 图标，切换时只启用其中一个 */
 class Launcher1 : WelcomeActivity()
 class Launcher2 : WelcomeActivity()
 class Launcher3 : WelcomeActivity()
-class Launcher4 : WelcomeActivity()
-class Launcher5 : WelcomeActivity()
-class Launcher6 : WelcomeActivity()
-class Launcher7 : WelcomeActivity()
-class Launcher8 : WelcomeActivity()

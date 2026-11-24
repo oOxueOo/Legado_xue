@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import io.legado.app.R
@@ -49,6 +50,7 @@ class WelcomeConfigFragment : PreferenceFragment(),
 
     // 虽然启动页文字和图标都不显示不太好看，但仍然应该吧权力交给用户，故注释相关代码
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        migrateWelcomeShowTime()
         addPreferencesFromResource(R.xml.pref_config_welcome)
         val welcomeImage = AppConfig.welcomeImage
         val welcomeImageDark = AppConfig.welcomeImageDark
@@ -181,6 +183,30 @@ class WelcomeConfigFragment : PreferenceFragment(),
                 }
         }
         return super.onPreferenceTreeClick(preference)
+    }
+
+    /**
+     * 欢迎页显示时间由滑块（毫秒、Int）改成了下拉档位（String）。
+     * 历史值是 Int，ListPreference 读取 String 时会抛 ClassCastException，所以必须在 inflate 之前转成 String；
+     * 顺便把不在档位里的旧值（例如拖到 617 毫秒）就近对齐到最近的档位，右侧胶囊才不会空着。
+     */
+    private fun migrateWelcomeShowTime() {
+        val sp = preferenceManager.sharedPreferences ?: return
+        val stored = sp.all[PreferKey.welcomeShowTime]
+        val isInt = stored is Int
+        val raw = when (stored) {
+            is Int -> stored.toString()
+            is String -> stored
+            else -> return
+        }
+        val steps = resources.getStringArray(R.array.welcome_show_time_value)
+            .mapNotNull { it.toIntOrNull() }
+        if (steps.isEmpty()) return
+        val current = raw.toIntOrNull() ?: return
+        val target = steps.minByOrNull { kotlin.math.abs(it - current) } ?: return
+        if (isInt || target.toString() != raw) {
+            sp.edit { putString(PreferKey.welcomeShowTime, target.toString()) }
+        }
     }
 
     private fun upPreferenceSummary(preferenceKey: String, value: String?) {

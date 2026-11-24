@@ -32,12 +32,23 @@ class IconListPreference(context: Context, attrs: AttributeSet) : ListPreference
         layoutResource = R.layout.view_preference
         widgetLayoutResource = R.layout.view_icon
 
-        val a = context.theme.obtainStyledAttributes(attrs, R.styleable.IconListPreference, 0, 0)
+        // 缩略图和显示名都从 entryValues（@array/icons）推导，
+        // 不再单独维护一份 icon_names 数组，避免两处不同步。
+        val values = entryValues
+        if (!values.isNullOrEmpty()) {
+            iconNames = values
+        } else {
+            val a = context.theme.obtainStyledAttributes(attrs, R.styleable.IconListPreference, 0, 0)
+            try {
+                iconNames = a.getTextArray(R.styleable.IconListPreference_icons) ?: emptyArray()
+            } finally {
+                a.recycle()
+            }
+        }
 
-        iconNames = try {
-            a.getTextArray(R.styleable.IconListPreference_icons)
-        } finally {
-            a.recycle()
+        val labels = Array<CharSequence>(iconNames.size) { labelOf(iconNames[it].toString()) }
+        if (entries.isNullOrEmpty() || entries.size != labels.size) {
+            entries = labels
         }
 
         for (iconName in iconNames) {
@@ -49,6 +60,13 @@ class IconListPreference(context: Context, attrs: AttributeSet) : ListPreference
             }
             mEntryDrawables.add(d)
         }
+    }
+
+    /** ic_launcher → iconMain；launcher1 → icon1 */
+    private fun labelOf(value: String): String {
+        if (value == "ic_launcher") return "iconMain"
+        val suffix = value.removePrefix("launcher")
+        return if (suffix.isEmpty()) value else "icon$suffix"
     }
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
@@ -67,8 +85,7 @@ class IconListPreference(context: Context, attrs: AttributeSet) : ListPreference
         if (v is ImageView) {
             val selectedIndex = findIndexOfValue(value)
             if (selectedIndex >= 0) {
-                val drawable = mEntryDrawables[selectedIndex]
-                v.setImageDrawable(drawable)
+                mEntryDrawables.getOrNull(selectedIndex)?.let { v.setImageDrawable(it) }
             }
         }
     }
@@ -165,13 +182,15 @@ class IconListPreference(context: Context, attrs: AttributeSet) : ListPreference
                 payloads: MutableList<Any>
             ) {
                 binding.run {
+                    // entries / entryValues / iconNames 三个数组长度由资源保证一致，
+                    // 但后续增删图标仍可能对不上，这里统一按下标兜底，避免越界崩溃
                     val index = findIndexOfValue(item.toString())
-                    dialogEntries?.let {
-                        label.text = it[index]
+                    dialogEntries?.getOrNull(index)?.let {
+                        label.text = it
                     }
-                    dialogIconNames?.let {
+                    dialogIconNames?.getOrNull(index)?.let {
                         val resId = context.resources
-                            .getIdentifier(it[index].toString(), "mipmap", context.packageName)
+                            .getIdentifier(it.toString(), "mipmap", context.packageName)
                         val d = try {
                             context.getCompatDrawable(resId)
                         } catch (e: Exception) {

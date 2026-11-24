@@ -57,22 +57,17 @@
         <item>常亮</item>
     </string-array>
 
+    <string-array name="welcome_show_time_title">
+        <item>不显示</item>
+        <item>0.3 秒</item>
+        <item>0.5 秒</item>
+        <item>0.8 秒</item>
+    </string-array>
+
     <string-array name="manga_read_mode_title">
         <item>@string/manga_mode_scroll</item>
         <item>@string/manga_mode_normal</item>
         <item>@string/manga_mode_japanese</item>
-    </string-array>
-
-    <string-array name="icon_names">
-        <item>iconMain</item>
-        <item>icon1</item>
-        <item>icon2</item>
-        <item>icon3</item>
-        <item>icon4</item>
-        <item>icon5</item>
-        <item>icon6</item>
-        <item>icon7</item>
-        <item>icon8</item>
     </string-array>
 
     <string-array name="chinese_mode">

@@ -2165,7 +2165,7 @@
     <!-- App Settings -->
     <string name="time_hour">小时</string>
     <string name="welcome_show_time">欢迎页显示时间</string>
-    <string name="welcome_show_time_summary">设为0不显示欢迎页</string>
+    <string name="welcome_show_time_summary">选「不显示」则跳过欢迎页</string>
     <string name="domain">域名</string>
 
     <!-- History & Read Record -->

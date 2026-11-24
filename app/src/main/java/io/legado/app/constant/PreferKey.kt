@@ -116,6 +116,8 @@ object PreferKey {
     const val changeSourceShowScore = "changeSourceShowScore"
     const val chineseConverterType = "chineseConverterType"
     const val launcherIcon = "launcherIcon"
+    /** 图标重新编号的一次性迁移标记，避免旧值被反复映射 */
+    const val launcherIconMigrated = "launcherIconMigrated"
     const val textSelectAble = "selectText"
     const val shareLayout = "shareLayout"
     const val mangaReadMode = "mangaReadMode"

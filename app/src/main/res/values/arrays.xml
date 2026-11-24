@@ -105,6 +105,13 @@
 		<item>Always</item>
 	</string-array>
 
+	<string-array name="welcome_show_time_title">
+		<item>Off</item>
+		<item>0.3 s</item>
+		<item>0.5 s</item>
+		<item>0.8 s</item>
+	</string-array>
+
 	<string-array name="screen_direction_title">
 		<item>@string/screen_unspecified</item>
 		<item>@string/screen_portrait</item>
@@ -138,18 +145,6 @@
 	<string-array name="progress_bar_behavior_title">
 		<item>@string/adjust_chapter_page</item>
 		<item>@string/adjust_chapter_index</item>
-	</string-array>
-
-	<string-array name="icon_names" tools:ignore="Typos">
-		<item>iconMain</item>
-		<item>icon1</item>
-		<item>icon2</item>
-		<item>icon3</item>
-		<item>icon4</item>
-		<item>icon5</item>
-		<item>icon6</item>
-        <item>icon7</item>
-		<item>icon8</item>
 	</string-array>
 
 	<string-array name="chinese_mode">

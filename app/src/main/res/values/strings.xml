@@ -1745,7 +1745,7 @@
     <!-- App Settings -->
     <string name="time_hour">Hour</string>
     <string name="welcome_show_time">Welcome Page Display Time</string>
-    <string name="welcome_show_time_summary">Set to 0 to hide welcome page</string>
+    <string name="welcome_show_time_summary">Choose Off to skip the welcome page</string>
     <string name="domain">Domain</string>
 
     <!-- History & Read Record -->

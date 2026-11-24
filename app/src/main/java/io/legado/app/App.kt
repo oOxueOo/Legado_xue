@@ -91,7 +91,10 @@ class App : Application() {
         TimberLog.init(this, isDebuggable)
         oldConfig = Configuration(resources.configuration)
         applyDayNightInit(this)
-        LauncherIconHelp.fixLauncherIconPref()
+        // 图标状态校正要多次跨进程查询 PackageManager，别压在主线程上
+        CoroutineScope(Dispatchers.IO).launch {
+            LauncherIconHelp.fixLauncherIconPref()
+        }
         AppConfig.migrateClipboardImportMode()
         registerActivityLifecycleCallbacks(LifecycleHelp)
         defaultSharedPreferences.registerOnSharedPreferenceChangeListener(AppConfig)
