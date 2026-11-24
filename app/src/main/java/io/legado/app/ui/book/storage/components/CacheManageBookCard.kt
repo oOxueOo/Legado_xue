@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,6 +28,7 @@ import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.theme.composeActionShape
 import io.legado.app.ui.theme.composePanelShape
 import io.legado.app.ui.widget.components.AppBookCover
+import io.legado.app.ui.widget.components.settings.appSettingsRowDecoration
 
 /**
  * 缓存管理列表里的一本书
@@ -44,19 +43,27 @@ fun CacheManageBookCard(
     onUpload: () -> Unit,
     onUseCache: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
 ) {
     val book = item.book
     val hasCache = item.cachedCount > 0
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = composePanelShape(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            // 与「我的」页同款行分隔线：面板内逐行 1dp，末行不画
+            .appSettingsRowDecoration(
+                shape = composePanelShape(),
+                dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                showDivider = showDivider
+            )
+            .padding(
+                horizontal = AppDimens.panelRowHorizontalPadding,
+                vertical = AppDimens.panelRowVerticalPadding
+            )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AppDimens.manageCardPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
             AppBookCover(

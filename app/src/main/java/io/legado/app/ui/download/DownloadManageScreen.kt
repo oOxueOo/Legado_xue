@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Schedule
@@ -42,6 +42,7 @@ import io.legado.app.ui.theme.pageTopBarColors
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
 
 /**
  * 下载管理主界面
@@ -155,26 +156,30 @@ fun DownloadManageScreen(
                     }
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        top = AppDimens.screenPadding,
-                        bottom = AppDimens.screenPadding + navigationBarBottomInset,
-                        start = AppDimens.screenPadding,
-                        end = AppDimens.screenPadding
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.cardSpacing)
-                ) {
-                    items(filteredTasks, key = { it.id }) { task ->
-                        DownloadTaskCard(
-                            task = task,
-                            onCancelClick = { viewModel.cancelDownload(task.id) },
-                            onRetryClick = { viewModel.retryDownload(task.id) },
-                            onOpenFileClick = { viewModel.openFile(task.id) },
-                            onOpenFolderClick = { viewModel.openFolder() },
-                            onCopyPathClick = { viewModel.copyPath(task.id) }
+                // 与「我的」页统一：整块圆角面板铺满，任务行在其中滚动，行间用 1dp 分隔线
+                AppPanelListSurface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = AppDimens.panelHorizontalPadding,
+                            end = AppDimens.panelHorizontalPadding,
+                            top = AppDimens.panelTopPadding,
+                            bottom = navigationBarBottomInset
                         )
+                ) {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        itemsIndexed(filteredTasks, key = { _, task -> task.id }) { index, task ->
+                            DownloadTaskCard(
+                                task = task,
+                                onCancelClick = { viewModel.cancelDownload(task.id) },
+                                onRetryClick = { viewModel.retryDownload(task.id) },
+                                onOpenFileClick = { viewModel.openFile(task.id) },
+                                onOpenFolderClick = { viewModel.openFolder() },
+                                onCopyPathClick = { viewModel.copyPath(task.id) },
+                                showDivider = index < filteredTasks.lastIndex
+                            )
+                        }
                     }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
             }
         }

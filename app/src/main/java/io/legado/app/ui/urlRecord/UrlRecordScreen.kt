@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 
@@ -51,11 +52,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import io.legado.app.R
 import io.legado.app.data.entities.UrlRecord
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.composePanelShape
 import io.legado.app.ui.theme.pageCardContainerColor
+import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
+import io.legado.app.ui.widget.components.settings.appSettingsRowDecoration
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -627,25 +633,42 @@ private fun GroupedRecordList(
     groupedRecords: Map<String, List<UrlRecord>>,
     onRecordClick: (UrlRecord) -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + navigationBarBottomInset),
+    // 与「我的」页统一：整块圆角面板铺满，日期分组标题与记录行都在面板内
+    AppPanelListSurface(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                start = AppDimens.panelHorizontalPadding,
+                end = AppDimens.panelHorizontalPadding,
+                top = AppDimens.panelTopPadding,
+                bottom = navigationBarBottomInset
+            )
     ) {
-        groupedRecords.forEach { (dateGroup, records) ->
-            item(key = "header_$dateGroup") {
-                Text(
-                    text = dateGroup,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            items(records, key = { it.id }) { record ->
-                UrlRecordItem(
-                    record = record,
-                    onClick = { onRecordClick(record) },
-                )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = AppDimens.panelSpacing),
+        ) {
+            groupedRecords.forEach { (dateGroup, records) ->
+                item(key = "header_$dateGroup") {
+                    Text(
+                        text = dateGroup,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = pageSecondaryTextColor(),
+                        modifier = Modifier.padding(
+                            start = AppDimens.panelRowHorizontalPadding,
+                            top = AppDimens.panelTitleTopPadding,
+                            end = AppDimens.panelRowHorizontalPadding,
+                            bottom = AppDimens.panelTitleBottomPadding
+                        ),
+                    )
+                }
+                itemsIndexed(records, key = { _, it -> it.id }) { index, record ->
+                    UrlRecordItem(
+                        record = record,
+                        showDivider = index < records.lastIndex,
+                        onClick = { onRecordClick(record) },
+                    )
+                }
             }
         }
     }
@@ -658,23 +681,27 @@ private fun GroupedRecordList(
 private fun UrlRecordItem(
     record: UrlRecord,
     onClick: () -> Unit,
+    showDivider: Boolean = true,
 ) {
     val dateFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+            .clickable(onClick = onClick)
+            // 与「我的」页同款行分隔线：面板内逐行 1dp，末行不画
+            .appSettingsRowDecoration(
+                shape = composePanelShape(),
+                dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                showDivider = showDivider
+            )
+            .padding(
+                horizontal = AppDimens.panelRowHorizontalPadding,
+                vertical = AppDimens.panelRowVerticalPadding
+            ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

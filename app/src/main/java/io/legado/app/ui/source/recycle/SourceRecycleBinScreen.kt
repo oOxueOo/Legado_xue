@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -53,6 +54,8 @@ import io.legado.app.ui.source.recycle.components.SourceRecycleBinItem
 import io.legado.app.ui.source.recycle.components.SourceRecycleDropdownMenu
 import io.legado.app.ui.source.recycle.components.SourceRecycleDropdownMenuItem
 import io.legado.app.ui.theme.pageSecondaryTextColor
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
@@ -363,18 +366,30 @@ fun SourceRecycleBinScreen(
                     )
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp + navigationBarBottomInset),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                // 与「我的」页统一：整块圆角面板铺满，回收站条目在面板内排列，行间 1dp 分隔线
+                AppPanelListSurface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = AppDimens.panelHorizontalPadding,
+                            end = AppDimens.panelHorizontalPadding,
+                            top = AppDimens.panelTopPadding,
+                            bottom = navigationBarBottomInset
+                        )
                 ) {
-                    items(displayedItems, key = { it.id }) { item ->
-                        val selected = item.id in selectedIds
-                        SourceRecycleBinItem(
-                            item = item,
-                            selected = selected,
-                            secondaryTextColor = secondaryTextColor,
-                            menuExpanded = itemMenuExpanded == item.id,
-                            onToggleSelected = {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = AppDimens.panelSpacing)
+                    ) {
+                        itemsIndexed(displayedItems, key = { _, it -> it.id }) { index, item ->
+                            val selected = item.id in selectedIds
+                            SourceRecycleBinItem(
+                                item = item,
+                                selected = selected,
+                                secondaryTextColor = secondaryTextColor,
+                                menuExpanded = itemMenuExpanded == item.id,
+                                showDivider = index < displayedItems.lastIndex,
+                                onToggleSelected = {
                                 itemMenuExpanded = null
                                 viewModel.toggleSelected(item.id)
                             },
@@ -401,7 +416,7 @@ fun SourceRecycleBinScreen(
                             }
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                    }
                 }
             }
         }

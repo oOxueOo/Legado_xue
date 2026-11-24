@@ -28,7 +28,7 @@ import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
-import io.legado.app.ui.widget.recycler.VerticalDivider
+import io.legado.app.ui.widget.recycler.applyPanelCard
 
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
@@ -93,7 +93,8 @@ sendToClip(text)
 
     private fun initView() = binding.run {
         recyclerView.setEdgeEffectColor(primaryColor)
-        recyclerView.addItemDecoration(VerticalDivider(this@TxtTocRuleActivity))
+                // 与「我的」页统一：整块圆角面板 + 行分隔线（替代原先通栏的 VerticalDivider）
+        recyclerView.applyPanelCard()
         recyclerView.adapter = adapter
         recyclerView.setFastScrollEnabled(true)
         recyclerView.isVerticalScrollBarEnabled = false

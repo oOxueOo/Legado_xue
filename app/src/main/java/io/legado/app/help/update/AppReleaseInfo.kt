@@ -75,6 +75,17 @@ private fun compareVersionName(remoteVersionName: String, currentVersionName: St
     }
     val (remoteBase, remoteSerial) = splitVersionSerial(remoteVersion)
     val (currentBase, currentSerial) = splitVersionSerial(currentVersion)
+    // 仓库里遗留过日期式版本号（如 3.26.112314），段数与本自建版本不同：
+    // 远端段数更多时是历史旧包，不能提示更新；反过来从旧日期版升到 X 序号版则放行
+    val remoteSegments = remoteBase.count { it == '.' } + 1
+    val currentSegments = currentBase.count { it == '.' } + 1
+    if (remoteSegments != currentSegments) {
+        return when {
+            remoteSegments > currentSegments -> 0
+            remoteSerial > 0 && currentSerial == 0L -> 1
+            else -> 0
+        }
+    }
     val baseCompare = compareBaseVersion(remoteBase, currentBase)
     return if (baseCompare != 0) baseCompare else remoteSerial.compareTo(currentSerial)
 }

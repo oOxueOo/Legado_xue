@@ -1,6 +1,5 @@
 package io.legado.app.ui.source.recycle.components
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RestoreFromTrash
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
@@ -29,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.data.entities.SourceRecycleBin
 import io.legado.app.help.source.SourceRecycleBinHelp
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.composePanelShape
+import io.legado.app.ui.widget.components.settings.appSettingsRowDecoration
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,83 +47,82 @@ fun SourceRecycleBinItem(
     onMenuOpen: () -> Unit,
     onMenuDismiss: () -> Unit,
     onRestoreClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    showDivider: Boolean = true
 ) {
-    val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             // 无障碍：合并卡片内文本节点（accessibility.md §15.2）
             .semantics(mergeDescendants = true) {}
-            .border(1.dp, borderColor, MaterialTheme.shapes.medium)
-            .clickable(onClick = onToggleSelected),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = { onToggleSelected() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            .clickable(onClick = onToggleSelected)
+            // 与「我的」页同款行分隔线：面板内逐行 1dp，末行不画
+            .appSettingsRowDecoration(
+                shape = composePanelShape(),
+                dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                showDivider = showDivider
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name.ifBlank { item.key },
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = stringResource(
-                        R.string.source_recycle_bin_type_group,
-                        typeLabel(item.type),
-                        item.groupName.orEmpty().ifBlank { stringResource(R.string.no_group) }
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = secondaryTextColor
-                )
-                Text(
-                    text = stringResource(
-                        R.string.source_recycle_bin_time_left,
-                        formatTime(item.deletedAt),
-                        remainingDays(item.expireAt)
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = secondaryTextColor
-                )
+            .padding(
+                horizontal = AppDimens.panelRowHorizontalPadding,
+                vertical = AppDimens.panelRowVerticalPadding
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = selected,
+            onCheckedChange = { onToggleSelected() },
+            colors = CheckboxDefaults.colors(
+                checkedColor = MaterialTheme.colorScheme.primary,
+                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.name.ifBlank { item.key },
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = stringResource(
+                    R.string.source_recycle_bin_type_group,
+                    typeLabel(item.type),
+                    item.groupName.orEmpty().ifBlank { stringResource(R.string.no_group) }
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = secondaryTextColor
+            )
+            Text(
+                text = stringResource(
+                    R.string.source_recycle_bin_time_left,
+                    formatTime(item.deletedAt),
+                    remainingDays(item.expireAt)
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = secondaryTextColor
+            )
+        }
+        Box {
+            IconButton(onClick = onMenuOpen) {
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
             }
-            Box {
-                IconButton(onClick = onMenuOpen) {
-                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
-                }
-                SourceRecycleDropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = onMenuDismiss
-                ) {
-                    SourceRecycleDropdownMenuItem(
-                        text = stringResource(R.string.restore),
-                        leadingIcon = {
-                            Icon(Icons.Default.RestoreFromTrash, contentDescription = null)
-                        },
-                        onClick = onRestoreClick
-                    )
-                    SourceRecycleDropdownMenuItem(
-                        text = stringResource(R.string.delete_forever),
-                        leadingIcon = {
-                            Icon(Icons.Default.DeleteForever, contentDescription = null)
-                        },
-                        destructive = true,
-                        onClick = onDeleteClick
-                    )
-                }
+            SourceRecycleDropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = onMenuDismiss
+            ) {
+                SourceRecycleDropdownMenuItem(
+                    text = stringResource(R.string.restore),
+                    leadingIcon = {
+                        Icon(Icons.Default.RestoreFromTrash, contentDescription = null)
+                    },
+                    onClick = onRestoreClick
+                )
+                SourceRecycleDropdownMenuItem(
+                    text = stringResource(R.string.delete_forever),
+                    leadingIcon = {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null)
+                    },
+                    destructive = true,
+                    onClick = onDeleteClick
+                )
             }
         }
     }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -58,6 +59,8 @@ import io.legado.app.ui.widget.components.AppSearchBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.VerticalScrollbar
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
+import io.legado.app.ui.widget.components.navigationBarBottomInset
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
 
 /**
  * 缓存管理页
@@ -402,25 +405,34 @@ private fun CacheBookList(
             )
         }
         else -> Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = AppDimens.cardSpacing,
-                    bottom = AppDimens.screenPadding,
-                    start = AppDimens.screenPadding,
-                    end = AppDimens.screenPadding
-                ),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.cardSpacing)
-            ) {
-                items(state.items, key = { it.book.bookUrl }) { item ->
-                    CacheManageBookCard(
-                        item = item,
-                        onOpenChapters = { onOpenChapters(item) },
-                        onUpload = { onUpload(item) },
-                        onUseCache = { onUseCache(item) },
-                        onDelete = { onDelete(item) }
+            // 与「我的」页统一：整块圆角面板铺满，书籍行在其中滚动，行间 1dp 分隔线
+            AppPanelListSurface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = AppDimens.panelHorizontalPadding,
+                        end = AppDimens.panelHorizontalPadding,
+                        top = AppDimens.panelTopPadding,
+                        bottom = navigationBarBottomInset
                     )
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        bottom = AppDimens.panelSpacing
+                    )
+                ) {
+                    itemsIndexed(state.items, key = { _, it -> it.book.bookUrl }) { index, item ->
+                        CacheManageBookCard(
+                            item = item,
+                            onOpenChapters = { onOpenChapters(item) },
+                            onUpload = { onUpload(item) },
+                            onUseCache = { onUseCache(item) },
+                            onDelete = { onDelete(item) },
+                            showDivider = index < state.items.lastIndex
+                        )
+                    }
                 }
             }
             VerticalScrollbar(
@@ -481,44 +493,63 @@ private fun StorageStatsTab(
                 }
             }
         }
-        else -> Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = AppDimens.cardSpacing,
-                    bottom = AppDimens.screenPadding,
-                    start = AppDimens.screenPadding,
-                    end = AppDimens.screenPadding
-                ),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.cardSpacing)
-            ) {
-                item {
-                    CacheSummaryCard(
-                        totalSize = totalSize,
-                        itemCount = items.size
-                    )
+        else -> Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f)) {
+                // 与「我的」页统一：整块圆角面板铺满，汇总行 + 明细行都在面板内
+                AppPanelListSurface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = AppDimens.panelHorizontalPadding,
+                            end = AppDimens.panelHorizontalPadding,
+                            top = AppDimens.panelTopPadding
+                        )
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            bottom = AppDimens.panelSpacing
+                        )
+                    ) {
+                        item {
+                            CacheSummaryCard(
+                                totalSize = totalSize,
+                                itemCount = items.size,
+                                showDivider = items.isNotEmpty()
+                            )
+                        }
+                        itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+                            CacheItemCard(
+                                item = item,
+                                onExpandClick = { onExpand(item) },
+                                onClearClick = { onClear(item) },
+                                onDetailClearClick = { detailId -> onDetailClear(item.id, detailId) },
+                                onOpenPathClick = onOpenPath,
+                                showDivider = index < items.lastIndex
+                            )
+                        }
+                    }
                 }
-                items(items, key = { it.id }) { item ->
-                    CacheItemCard(
-                        item = item,
-                        onExpandClick = { onExpand(item) },
-                        onClearClick = { onClear(item) },
-                        onDetailClearClick = { detailId -> onDetailClear(item.id, detailId) },
-                        onOpenPathClick = onOpenPath
-                    )
-                }
-                item {
-                    BatchActionButton(
-                        text = stringResource(R.string.storage_clear_all),
-                        onClick = onClearAll
-                    )
-                }
+                VerticalScrollbar(
+                    state = listState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
             }
-            VerticalScrollbar(
-                state = listState,
-                modifier = Modifier.align(Alignment.CenterEnd)
-            )
+            // 批量清理按钮放在面板外，避免把操作按钮当成列表行
+            Box(
+                modifier = Modifier.padding(
+                    start = AppDimens.panelHorizontalPadding,
+                    end = AppDimens.panelHorizontalPadding,
+                    top = AppDimens.panelSpacing,
+                    bottom = AppDimens.panelSpacing + navigationBarBottomInset
+                )
+            ) {
+                BatchActionButton(
+                    text = stringResource(R.string.storage_clear_all),
+                    onClick = onClearAll
+                )
+            }
         }
     }
 }

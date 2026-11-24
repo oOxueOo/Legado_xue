@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
 import io.legado.app.ui.file.components.FileList
 import io.legado.app.ui.file.components.PathBreadcrumb
+import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.theme.pageTopBarBackground
 import io.legado.app.ui.theme.pageTopBarColors
 import io.legado.app.ui.widget.components.AppPageTopBar
@@ -142,7 +143,13 @@ fun FileManageScreen(
                         if (file != viewModel.currentDir) {
                             viewModel.requestDelete(file)
                         }
-                    }
+                    },
+                    // 与「我的」页一致的四周留白：左右 12dp、距顶 8dp
+                    modifier = Modifier.padding(
+                        start = AppDimens.panelHorizontalPadding,
+                        end = AppDimens.panelHorizontalPadding,
+                        top = AppDimens.panelTopPadding
+                    )
                 )
             }
         }

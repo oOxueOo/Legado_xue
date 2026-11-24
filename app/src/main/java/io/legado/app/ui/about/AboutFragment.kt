@@ -16,6 +16,7 @@ import io.legado.app.help.CrashHandler
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.update.AppUpdate
+import io.legado.app.lib.prefs.applySettingsCard
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.FileDoc
@@ -54,6 +55,7 @@ class AboutFragment : PreferenceFragmentCompat() {
         view.setBackgroundColor(Color.TRANSPARENT)
         listView.setBackgroundColor(Color.TRANSPARENT)
         listView.overScrollMode = View.OVER_SCROLL_NEVER
+        listView.applySettingsCard()
     }
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {

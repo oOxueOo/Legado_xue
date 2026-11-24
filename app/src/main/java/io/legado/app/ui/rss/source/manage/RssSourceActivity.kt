@@ -43,7 +43,7 @@ import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
-import io.legado.app.ui.widget.recycler.VerticalDivider
+import io.legado.app.ui.widget.recycler.applyPanelCard
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
 import io.legado.app.help.ExportResultHandler
@@ -306,7 +306,8 @@ class RssSourceActivity :
 
     private fun initRecyclerView() {
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        binding.recyclerView.addItemDecoration(VerticalDivider(this))
+                // 与「我的」页统一：整块圆角面板 + 行分隔线（替代原先通栏的 VerticalDivider）
+        binding.recyclerView.applyPanelCard()
         binding.recyclerView.adapter = adapter
         binding.recyclerView.setFastScrollEnabled(true)
         binding.recyclerView.isVerticalScrollBarEnabled = false

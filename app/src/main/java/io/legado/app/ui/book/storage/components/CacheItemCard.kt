@@ -20,8 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.help.storage.CacheDetail
 import io.legado.app.ui.book.storage.CacheItem
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.composePanelShape
+import io.legado.app.ui.widget.components.settings.appSettingsRowDecoration
 
 @Composable
 fun CacheItemCard(
@@ -49,7 +50,8 @@ fun CacheItemCard(
     onExpandClick: () -> Unit,
     onClearClick: () -> Unit,
     onDetailClearClick: (String) -> Unit,
-    onOpenPathClick: (String) -> Unit
+    onOpenPathClick: (String) -> Unit,
+    showDivider: Boolean = true
 ) {
     val borderColor = if (item.isExpanded) {
         MaterialTheme.colorScheme.primary
@@ -57,23 +59,27 @@ fun CacheItemCard(
         MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     }
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             // 无障碍：合并卡片内文本节点（accessibility.md §15.2）
             .semantics(mergeDescendants = true) {}
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            // 与「我的」页同款行分隔线；展开态不再靠外框描边区分，改由行内展开内容表达
+            .appSettingsRowDecoration(
+                shape = composePanelShape(),
+                dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                showDivider = showDivider
+            )
+            .padding(
+                horizontal = AppDimens.panelRowHorizontalPadding,
+                vertical = AppDimens.panelRowVerticalPadding
+            )
     ) {
         Column {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = item.canExpand) { onExpandClick() }
-                    .padding(16.dp)
             ) {
                 val compactWidth = maxWidth < 360.dp
                 Row(

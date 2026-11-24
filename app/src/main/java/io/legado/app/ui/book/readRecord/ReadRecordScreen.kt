@@ -41,11 +41,13 @@ import io.legado.app.help.glide.ImageLoader
 import io.legado.app.ui.book.readRecord.components.HeatmapCalendarBottomSheet
 import io.legado.app.ui.book.readRecord.components.HeatmapMode
 import io.legado.app.ui.book.readRecord.components.SummaryCard
+import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.theme.pageTopBarBackground
 import io.legado.app.ui.theme.pageTopBarColors
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
 import io.legado.app.ui.widget.components.swipe.SwipeActionContainer
 import io.legado.app.ui.widget.components.swipe.rememberSwipeDeleteAction
 import io.legado.app.utils.formatReadDuration
@@ -401,40 +403,55 @@ fun ReadRecordScreen(
                     }
                 }
             } else {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + navigationBarBottomInset),
+                // 与「我的」页统一：整块圆角面板铺满，汇总块与记录行都在面板内滚动
+                AppPanelListSurface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = AppDimens.panelHorizontalPadding,
+                            end = AppDimens.panelHorizontalPadding,
+                            top = AppDimens.panelTopPadding,
+                            bottom = navigationBarBottomInset
+                        )
                 ) {
-                    item {
-                        SummaryCard(
-                            totalReadTime = state.totalReadTime,
-                            todayReadTime = state.todayReadTime,
-                            monthReadTime = state.monthReadTime,
-                            activeDays = state.activeDays,
-                            currentStreak = state.currentStreak,
-                            longestStreak = state.longestStreak,
-                            bookCount = state.latestRecords.size,
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            bottom = AppDimens.panelSpacing
+                        ),
+                    ) {
+                        item {
+                            SummaryCard(
+                                totalReadTime = state.totalReadTime,
+                                todayReadTime = state.todayReadTime,
+                                monthReadTime = state.monthReadTime,
+                                activeDays = state.activeDays,
+                                currentStreak = state.currentStreak,
+                                longestStreak = state.longestStreak,
+                                bookCount = state.latestRecords.size,
+                            )
+                        }
+
+                        RecordListContent(
+                            displayMode = displayMode,
+                            state = state,
+                            viewModel = viewModel,
+                            onBookClick = onBookClick,
+                            onConfirmDelete = { action ->
+                                if (skipDeleteConfirm) {
+                                    action()
+                                } else {
+                                    pendingDeleteAction = action
+                                    showDeleteConfirm = true
+                                }
+                            },
+                            onMergeClick = { record ->
+                                selectedRecord = record
+                                showMergeDialog = true
+                            },
                         )
                     }
-
-                    RecordListContent(
-                        displayMode = displayMode,
-                        state = state,
-                        viewModel = viewModel,
-                        onBookClick = onBookClick,
-                        onConfirmDelete = { action ->
-                            if (skipDeleteConfirm) {
-                                action()
-                            } else {
-                                pendingDeleteAction = action
-                                showDeleteConfirm = true
-                            }
-                        },
-                        onMergeClick = { record ->
-                            selectedRecord = record
-                            showMergeDialog = true
-                        },
-                    )
                 }
             }
 

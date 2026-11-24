@@ -23,8 +23,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -49,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.service.DownloadStatus
 import io.legado.app.service.DownloadTask
-import io.legado.app.ui.theme.pageCardContainerColor
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.composePanelShape
+import io.legado.app.ui.widget.components.settings.appSettingsRowDecoration
 import io.legado.app.utils.ConvertUtils
 
 /**
@@ -64,11 +64,12 @@ fun DownloadTaskCard(
     onOpenFileClick: () -> Unit = {},
     onOpenFolderClick: () -> Unit = {},
     onCopyPathClick: () -> Unit = {},
+    showDivider: Boolean = true,
 ) {
-    val containerColor = pageCardContainerColor()
     var showMenu by remember { mutableStateOf(false) }
+    val shape = composePanelShape()
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             // 无障碍：合并卡片内文本节点（accessibility.md §15.2）
@@ -79,15 +80,18 @@ fun DownloadTaskCard(
                 } else {
                     Modifier
                 },
+            )
+            // 与「我的」页同款行分隔线：面板内逐行画 1dp，末行不画
+            .appSettingsRowDecoration(
+                shape = shape,
+                dividerColor = MaterialTheme.colorScheme.outlineVariant,
+                showDivider = showDivider
+            )
+            .padding(
+                horizontal = AppDimens.panelRowHorizontalPadding,
+                vertical = AppDimens.panelRowVerticalPadding
             ),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -101,12 +105,11 @@ fun DownloadTaskCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = task.fileName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fontWeight = FontWeight.Medium,
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.panelRowTitleSpacing))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // 状态文本
                         Text(
@@ -274,7 +277,6 @@ fun DownloadTaskCard(
                 )
             }
         }
-    }
 }
 
 /**

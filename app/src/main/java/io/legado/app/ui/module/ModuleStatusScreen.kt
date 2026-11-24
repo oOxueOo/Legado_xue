@@ -1,24 +1,15 @@
 package io.legado.app.ui.module
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,21 +18,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
-import io.legado.app.ui.theme.pageCardContainerColor
+import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
+import io.legado.app.ui.widget.components.settings.AppPanelListRow
+import io.legado.app.ui.widget.components.settings.AppPanelListSurface
 
 /**
- * 模块状态主界面
+ * 模块状态主界面。
+ *
+ * 视觉与「我的」页统一：透明页面底 + 整块圆角面板，行内为「状态点（图标位）+ 模块名 + 状态文案」，
+ * 行高、内边距、字号与「我的」页一致；状态点作为行首元素保留原样。
+ *
  * @param viewModel ViewModel实例
  * @param onBackClick 返回回调
  */
@@ -67,53 +63,33 @@ fun ModuleStatusScreen(
             )
         }
     ) { paddingValues ->
-        // 模块列表
-        LazyColumn(
-            modifier = Modifier.padding(paddingValues),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp + navigationBarBottomInset),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(modules, key = { it.name }) { module ->
-                ModuleStatusCard(module)
-            }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-        }
-    }
-}
-
-/**
- * 模块状态卡片
- * @param module 模块状态项
- */
-@Composable
-private fun ModuleStatusCard(module: ModuleStatusItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = pageCardContainerColor()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
+        AppPanelListSurface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(
+                    start = AppDimens.panelHorizontalPadding,
+                    end = AppDimens.panelHorizontalPadding,
+                    top = AppDimens.panelTopPadding,
+                    bottom = navigationBarBottomInset
+                )
         ) {
-            // 状态指示点
-            StatusDot(module.status)
-            Spacer(modifier = Modifier.width(12.dp))
-            // 模块名称
-            Text(
-                text = module.name,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
-            // 状态文本
-            Text(
-                text = module.status.label(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = module.status.color()
-            )
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                itemsIndexed(modules, key = { _, module -> module.name }) { index, module ->
+                    AppPanelListRow(
+                        title = module.name,
+                        showDivider = index < modules.lastIndex,
+                        leading = { StatusDot(module.status) },
+                        trailing = {
+                            Text(
+                                text = module.status.label(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = module.status.color()
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -150,7 +126,7 @@ private fun ModuleRunStatus.label(): String {
 private fun ModuleRunStatus.color(): Color {
     return when (this) {
         ModuleRunStatus.RUNNING -> Color(0xFF2E7D32) // 绿色
-        ModuleRunStatus.IDLE -> MaterialTheme.colorScheme.onSurfaceVariant // 灰色
+        ModuleRunStatus.IDLE -> pageSecondaryTextColor()
         ModuleRunStatus.ERROR -> MaterialTheme.colorScheme.error // 红色
         ModuleRunStatus.DISABLED -> MaterialTheme.colorScheme.outline // 轮廓色
     }

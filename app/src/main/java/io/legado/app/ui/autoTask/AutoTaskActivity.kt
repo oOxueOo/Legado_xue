@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.databinding.ActivityAutoTaskBinding
+import io.legado.app.ui.widget.recycler.applyPanelCard
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.DirectLinkUpload
@@ -136,6 +137,8 @@ class AutoTaskActivity : VMBaseActivity<ActivityAutoTaskBinding, AutoTaskViewMod
 
     private fun initView() = binding.run {
         recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this@AutoTaskActivity)
+        // 与「我的」页统一：整块圆角面板 + 行分隔线
+        recyclerView.applyPanelCard()
         recyclerView.adapter = adapter
         dragSelectTouchHelper.attachToRecyclerView(recyclerView)
         ItemTouchHelper(itemTouchCallback).attachToRecyclerView(recyclerView)

@@ -34,7 +34,7 @@ import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
-import io.legado.app.ui.widget.recycler.VerticalDivider
+import io.legado.app.ui.widget.recycler.applyPanelCard
 
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
@@ -126,7 +126,8 @@ class ReplaceRuleActivity :
         binding.recyclerView.adapter = adapter
         binding.recyclerView.setFastScrollEnabled(true)
         binding.recyclerView.isVerticalScrollBarEnabled = false
-        binding.recyclerView.addItemDecoration(VerticalDivider(this))
+                // 与「我的」页统一：整块圆角面板 + 行分隔线（替代原先通栏的 VerticalDivider）
+        binding.recyclerView.applyPanelCard()
         val itemTouchCallback = ItemTouchCallback(adapter)
         itemTouchCallback.isCanDrag = true
         val dragSelectTouchHelper: DragSelectTouchHelper =

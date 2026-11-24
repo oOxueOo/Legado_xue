@@ -3,30 +3,37 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="8dp"
+    android:minHeight="60dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
     android:background="?android:attr/selectableItemBackground">
 
     <TextView
         android:id="@+id/tv_chapter_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="4dp"
+        android:textSize="16sp"
+        android:textColor="@color/primaryText"
         android:singleLine="true" />
 
     <TextView
         android:id="@+id/tv_book_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="4dp"
         android:textSize="12sp"
+        android:textColor="@color/secondaryText"
+        android:layout_marginTop="4dp"
         android:singleLine="true" />
 
     <TextView
         android:id="@+id/tv_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="4dp"
         android:textSize="12sp"
+        android:textColor="@color/secondaryText"
+        android:layout_marginTop="4dp"
         android:singleLine="true" />
 
 </LinearLayout>

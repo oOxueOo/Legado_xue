@@ -12,7 +12,7 @@ import androidx.preference.PreferenceFragmentCompat
 import io.legado.app.lib.prefs.EditTextPreferenceDialog
 import io.legado.app.lib.prefs.ListPreferenceDialog
 import io.legado.app.lib.prefs.MultiSelectListPreferenceDialog
-import io.legado.app.lib.prefs.SettingsCardDecoration
+import io.legado.app.lib.prefs.applySettingsCard
 import io.legado.app.utils.applyNavigationBarPadding
 
 abstract class PreferenceFragment : PreferenceFragmentCompat() {
@@ -24,9 +24,7 @@ abstract class PreferenceFragment : PreferenceFragmentCompat() {
         listView.clipToPadding = false
         listView.applyNavigationBarPadding()
         // 分组卡片底衬：与「我的」页同款半透明圆角卡片，按分组整块绘制
-        if (listView.itemDecorationCount == 0) {
-            listView.addItemDecoration(SettingsCardDecoration(requireContext()))
-        }
+        listView.applySettingsCard()
     }
 
     @SuppressLint("RestrictedApi")
