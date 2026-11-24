@@ -93,7 +93,7 @@ class SettingsCardDecoration(context: Context) : RecyclerView.ItemDecoration() {
 
         for (i in 0 until parent.childCount) {
             val child = parent.getChildAt(i) ?: continue
-            val position = child.getChildAdapterPosition(child)
+            val position = parent.getChildAdapterPosition(child)
             if (position == RecyclerView.NO_POSITION) continue
             val current = adapter.getItem(position)
             if (current is PreferenceCategory) continue
