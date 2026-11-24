@@ -2,6 +2,7 @@ package io.legado.app.ui.widget.recycler
 
 import android.content.Context
 import androidx.core.graphics.ColorUtils
+import io.legado.app.utils.ColorUtils as AppColorUtils
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.ThemeUtils
 
@@ -42,6 +43,6 @@ object RecyclerPanelTokens {
     }
 
     private fun isLight(context: Context, background: Int): Boolean {
-        return !AppConfig.isNightTheme && ColorUtils.isColorLight(background)
+        return !AppConfig.isNightTheme && AppColorUtils.isColorLight(background)
     }
 }
