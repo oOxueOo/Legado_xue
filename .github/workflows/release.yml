@@ -1,4 +1,4 @@
-name: Release Build 双包打包
+name: Release Build 单包打包
 
 on:
   workflow_dispatch:
@@ -17,8 +17,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          # 版本号规则：X<主版本>.<构建序号>，例如 X1.0；每次打包从已有 tag 里取最大序号 +1
-          # 主版本允许手动升（推一个 X2.0 的 tag 后，后续自动从 X2.1 续）
+          # 版本号规则：从 X1.0 起，每次构建 +0.1（十进制）；等价于次版本 0→9、满 10 进 1，X1.9 → X2.0
+          # 主版本也允许手动升（推一个 X2.0 的 tag 后，后续自动从 X2.1 续）
           prev=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
             | jq -r '.[].tag_name' | sed -E 's/^beta-//' \
@@ -27,7 +27,14 @@ jobs:
             version="X1.0"
             echo "已确定版本号 $version（首个代号版本）"
           else
-            version="X${prev%%.*}.$(( ${prev##*.} + 1 ))"
+            major=${prev%%.*}
+            minor=${prev##*.}
+            # 每次 +0.1，满 10 进 1：X1.9 → X2.0，X2.9 → X3.0
+            if [ "$minor" -ge 9 ]; then
+              version="X$(( major + 1 )).0"
+            else
+              version="X${major}.$(( minor + 1 ))"
+            fi
             echo "已确定版本号 $version（上一版 X$prev）"
           fi
           echo "version=$version" >> $GITHUB_OUTPUT
@@ -60,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        product: [ appS, appMax, appLegacy ]   # 打三个包：共存版、测试版、兼容版
+        product: [ appMax ]   # 只打一个包（app 的 release，arm64-v8a）
       fail-fast: false
       max-parallel: 4
     outputs:
@@ -127,17 +134,15 @@ jobs:
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: 阅读双包版 ${{ needs.prepare.outputs.version }}
+          name: 阅读X ${{ needs.prepare.outputs.version }}
           tag_name: ${{ needs.prepare.outputs.version }}
           body: |
-            ## 自动打包：两个版本共存
-            
-            - 📱 阅读A·Max
-            - 📱 阅读·Max
-            
-            两个版本可以同时安装，互不冲突。
+            ## 阅读X ${{ needs.prepare.outputs.version }}
+
+            单一 arm64-v8a 安装包，覆盖安装即可。
 
             ${{ fromJSON(needs.prepare.outputs.contributors_content || '""') }}
+          prerelease: true
           files: all_apks/*.apk
           fail_on_unmatched_files: true
         env:
@@ -168,9 +173,9 @@ jobs:
           AUTH_HEADER="Authorization: token $GITEE_TOKEN"
           
           TAG_NAME="$VERSION"
-          RELEASE_NAME="阅读双包版 $VERSION"
+          RELEASE_NAME="阅读X $VERSION"
           CONTRIBUTORS=$(printf '%s' "$CONTRIBUTORS_JSON" | jq -r . 2>/dev/null || true)
-          RELEASE_BODY=$(printf '## 自动打包：两个版本共存\n\n- 📱 阅读A·Max\n- 📱 阅读·Max\n- 📱 阅读·兼容版\n\n三个版本可以同时安装，互不冲突。\n')
+          RELEASE_BODY=$(printf '## 阅读X %s\n\n单一 arm64-v8a 安装包，覆盖安装即可。\n' "$VERSION")
           if [ -n "$CONTRIBUTORS" ]; then
             RELEASE_BODY=$(printf '%s\n%s\n' "$RELEASE_BODY" "$CONTRIBUTORS")
           fi
@@ -182,7 +187,7 @@ jobs:
             --arg name "$RELEASE_NAME" \
             --arg body "$RELEASE_BODY" \
             --arg target_commitish "main" \
-            '{tag_name: $tag_name, name: $name, body: $body, target_commitish: $target_commitish, prerelease: false}')
+            '{tag_name: $tag_name, name: $name, body: $body, target_commitish: $target_commitish, prerelease: true}')
           RELEASE_JSON=$(curl -sS -X POST \
               -H "Content-Type: application/json" \
               -H "$AUTH_HEADER" \

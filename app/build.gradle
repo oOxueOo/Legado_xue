@@ -197,8 +197,9 @@ android {
         abi {
             enable enableAbiSplits
             reset()
-            include 'armeabi-v7a', 'arm64-v8a'
-            universalApk true
+            // 只出 arm64-v8a 一个包，不再产 armeabi-v7a / universal
+            include 'arm64-v8a'
+            universalApk false
         }
     }
     android.applicationVariants.configureEach { variant ->
