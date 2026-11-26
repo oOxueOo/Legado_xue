@@ -16,19 +16,22 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
     /**
      * Release 列表接口。
      *
-     * 直连 api.github.com 在国内多数网络下拿不到响应，请求本身也要套镜像前缀；
-     * 前缀与下载直链共用 [GithubMirror]，多镜像轮换 + 直连兜底都在那里统一处理。
+     * 直连 api.github.com 在国内多数网络下拿不到响应，请求本身也要能套镜像前缀；
+     * 前缀与下载直链共用 [GithubMirror]，但检测是「直连优先、镜像兜底」（gh-proxy 对 api 回 403）。
+     *
+     * per_page 只取 8 条：一个仓库一次只发一个 arm64 包，8 条足够覆盖所有变体的最新版本，
+     * 拉满 20 条会把每条 Release 的更新日志正文都搬下来，慢网下白白多等好几秒。
      */
     private const val RELEASES_API =
-        "https://api.github.com/repos/oOxueOo/Legado_xue/releases?per_page=20"
+        "https://api.github.com/repos/oOxueOo/Legado_xue/releases?per_page=8"
 
     /**
      * 检查更新的整体时限。
      *
-     * 串行试前缀最坏要走满四个候选（三个镜像 + 直连，单个 6 秒），
-     * 给到 26 秒才不会在第三个前缀还没试上时就被整体超时掐断。
+     * 串行试候选最坏要走满四个（直连 + 三个镜像，单个 5 秒），给到 22 秒才不会在
+     * 最后一个还没试上时就被整体超时掐断。
      */
-    private const val CHECK_UPDATE_TIMEOUT_MS = 26_000L
+    private const val CHECK_UPDATE_TIMEOUT_MS = 22_000L
 
     private val checkVariant: AppVariant
         get() = when (AppConfig.updateToVariant) {
