@@ -3,6 +3,7 @@ package io.legado.app.help.update
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.http.text
 import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit

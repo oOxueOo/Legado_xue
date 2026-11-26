@@ -243,7 +243,7 @@ private fun BookshelfGridContent(
 private fun BookshelfEntryItem(
     entry: BookshelfEntry,
     displayConfig: BookshelfDisplayConfig,
-    boardOverhang: Dp,
+    boardOverhang: Dp = AppDimens.shelfBoardOverhang,
     onClick: (BookshelfEntry) -> Unit,
     onLongClick: (BookshelfEntry) -> Unit,
 ) {
