@@ -38,13 +38,23 @@ import io.legado.app.ui.widget.components.AppBookCover
 private const val SHOW_BOOK_NAME_BELOW = 0
 private const val SHOW_BOOK_NAME_ON_COVER = 2
 
-/** 网格书名：两行内 12sp；需要三行时降到 11sp。块高固定三行，格子高度一致 */
-private const val SHELF_GRID_NAME_TEXT_SIZE = 12
-private const val SHELF_GRID_NAME_LINE_HEIGHT = 15
-private const val SHELF_GRID_NAME_DENSE_TEXT_SIZE = 11
-private const val SHELF_GRID_NAME_DENSE_LINE_HEIGHT = 14
+/**
+ * 网格书名：整名换行，最多三行；三行装不下就逐档降字号，务必显示全名。
+ *
+ * 关键坑：Compose 的 Text 在"高度不够"时也会加省略号（不只是 maxLines 不够）。
+ * 之前块高按 3×14sp=42dp 写死，而 12sp 的书名行高 15sp，三行要 45dp，
+ * 于是"实测两行、实际三行"的长名被高度判定溢出，第二行末尾直接变省略号。
+ * 现在：行高统一 1.2 倍字号（12sp→14.4sp），块高 46dp，三行最坏 43.2dp，留 2.8dp 余量；
+ * 量行时与绘制用同一套样式（显式 letterSpacing=0），避免"量出来两行、画出来三行"。
+ */
+private const val SHELF_GRID_NAME_TEXT_SIZE = 12f
 private const val SHELF_GRID_NAME_MAX_LINES = 3
 private const val SHELF_GRID_NAME_NORMAL_LINES = 2
+/** 三行时的降字号台阶：11 → 10.5 → 10 → 9.5 → 9，取第一个能三行装下的 */
+private val SHELF_GRID_NAME_DENSE_STEPS = floatArrayOf(11f, 10.5f, 10f, 9.5f, 9f)
+private const val SHELF_GRID_NAME_LINE_HEIGHT_RATIO = 1.2f
+/** 书名块高：按三行 15sp 留足余量，任何字号三行都装得下，不会被高度截断 */
+private const val SHELF_GRID_NAME_BLOCK_HEIGHT_SP = 46f
 private const val SHELF_GRID_OVERLAY_NAME_TEXT_SIZE = 11
 private const val SHELF_GRID_OVERLAY_NAME_LINE_HEIGHT = 14
 
@@ -164,49 +174,50 @@ fun BookshelfGridItem(
 }
 
 /**
- * 网格书名：整名最多三行。
+ * 网格书名：整名最多三行，尽量不省略。
  *
- * 上一版按标点把书名拆成「主标题 singleLine + 副标题」两行：主标题只准占一行，
- * 放不下就从 12sp 逐档降到 10.5sp，再不行就省略号——所以"我，最强毒士…"这类长名
- * 永远显示不全。现在不拆主副标题，整名按宽度换行：
- * 两行能装下就用 12sp；要三行才装得下就降到 11sp（行高 14sp）。
- * 块高固定三行（3 × 14sp），不管书名几行，格子高度都一样、搁板不歪。
+ * 早先按标点把书名拆成「主标题 singleLine + 副标题」，主标题只准一行，长名必然省略号；
+ * 之后改成整名换行，但块高只按 3×14sp=42dp 留，而 12sp 的行高 15sp 三行要 45dp，
+ * 只要"量出来两行、画出来三行"就会被高度判定溢出，第二行末尾变省略号
+ * （"用九千万亿警用金在缅北开派出所"就是这么被截的）。
+ * 现在：行高统一 1.2 倍字号，块高 46dp（三行最坏 43.2dp，留余量），
+ * 量行与绘制用同一套样式（显式 letterSpacing=0），两行装得下用 12sp，否则逐档降到能三行装下的字号。
  */
 @Composable
 private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val baseStyle = LocalTextStyle.current
     val blockHeight = remember(density) {
-        with(density) { (SHELF_GRID_NAME_DENSE_LINE_HEIGHT * SHELF_GRID_NAME_MAX_LINES).sp.toDp() }
+        with(density) { SHELF_GRID_NAME_BLOCK_HEIGHT_SP.sp.toDp() }
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val widthPx = constraints.maxWidth
         val measurer = rememberTextMeasurer()
-        // 先按 12sp 量一遍：两行装得下就不降字号，否则走三行 11sp
-        val needsThreeLines = remember(name, widthPx, baseStyle) {
-            measurer.measure(
+        val nameStyle = remember(name, widthPx, baseStyle) {
+            // 量行与绘制必须同一套样式：显式给 letterSpacing，避免主题默认字距把行数算少
+            fun styleOf(size: Float) = baseStyle.copy(
+                fontSize = size.sp,
+                lineHeight = (size * SHELF_GRID_NAME_LINE_HEIGHT_RATIO).sp,
+                letterSpacing = 0.sp,
+            )
+            fun linesAt(size: Float): Int = measurer.measure(
                 text = AnnotatedString(name),
-                style = baseStyle.copy(
-                    fontSize = SHELF_GRID_NAME_TEXT_SIZE.sp,
-                    lineHeight = SHELF_GRID_NAME_LINE_HEIGHT.sp,
-                ),
+                style = styleOf(size),
                 maxLines = Int.MAX_VALUE,
                 softWrap = true,
                 constraints = Constraints(maxWidth = widthPx),
-            ).lineCount > SHELF_GRID_NAME_NORMAL_LINES
-        }
-        val nameStyle = remember(needsThreeLines, baseStyle) {
-            if (needsThreeLines) {
-                baseStyle.copy(
-                    fontSize = SHELF_GRID_NAME_DENSE_TEXT_SIZE.sp,
-                    lineHeight = SHELF_GRID_NAME_DENSE_LINE_HEIGHT.sp,
-                )
-            } else {
-                baseStyle.copy(
-                    fontSize = SHELF_GRID_NAME_TEXT_SIZE.sp,
-                    lineHeight = SHELF_GRID_NAME_LINE_HEIGHT.sp,
-                )
+            ).lineCount
+
+            val size = when {
+                // 两行内就用标准字号
+                linesAt(SHELF_GRID_NAME_TEXT_SIZE) <= SHELF_GRID_NAME_NORMAL_LINES ->
+                    SHELF_GRID_NAME_TEXT_SIZE
+                // 需要三行：逐档降字号，取第一个能装下三行的
+                else -> SHELF_GRID_NAME_DENSE_STEPS.firstOrNull {
+                    linesAt(it) <= SHELF_GRID_NAME_MAX_LINES
+                } ?: SHELF_GRID_NAME_DENSE_STEPS.last()
             }
+            styleOf(size)
         }
         Column(
             modifier = Modifier
