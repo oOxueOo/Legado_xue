@@ -49,10 +49,19 @@ jobs:
       - id: set-ver
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -e
           # 版本号规则：从 X1.0 起，每次构建 +0.1（十进制）；等价于次版本 0→9、满 10 进 1，X1.9 → X2.0
           # 主版本也允许手动升（推一个 X2.0 的 tag 后，后续自动从 X2.1 续）
+          # 例外：提交说明里写 version:X1.3.1（可带子版本）时，本次就用它，不走自增
+          version=""
+          pin=$(printf '%s' "${COMMIT_MSG:-}" | grep -oE 'version:X[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | cut -d: -f2 || true)
+          if [ -n "$pin" ]; then
+            version="$pin"
+            echo "提交说明指定版本号 $version"
+          fi
+          if [ -z "$version" ]; then
           prev=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
             | jq -r '.[].tag_name' | sed -E 's/^beta-//' \
@@ -70,6 +79,7 @@ jobs:
               version="X${major}.$(( minor + 1 ))"
             fi
             echo "已确定版本号 $version（上一版 X$prev）"
+          fi
           fi
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "versionL=$version" >> $GITHUB_OUTPUT
@@ -93,7 +103,7 @@ jobs:
         run: |
           set -e
           # 不再判断 updateLog.md 改没改：统一用本次推送的提交说明作更新内容
-          BODY=$(printf '%s' "$COMMIT_MSG" | sed -n '1,20p')
+          BODY=$(printf '%s' "$COMMIT_MSG" | sed -n '1,20p' | grep -v '^version:X' || true)
           if [ -z "$BODY" ]; then BODY="* 常规更新"; fi
           CONTENT_JSON=$(printf '%s' "$BODY" | jq -Rs .)
           echo "body=$CONTENT_JSON" >> $GITHUB_OUTPUT

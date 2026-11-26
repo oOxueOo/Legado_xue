@@ -1,20 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<!--
-  鑷€傚簲鍥炬爣锛氫笁灞傜粺涓€鐢?<inset> 缂╄繘 26%銆?  鍘熷洜锛氬浘灞傜殑鍙瀹夊叏鍖哄彧鏈?72dp/108dp锛?6.7%锛夛紝鑰屾闈紙灏ゅ叾 HyperOS / MIUI锛?  杩樹細鍐嶅涓€涓?1.1~1.25 鐨勫浘鏍囩缉鏀剧郴鏁帮紝閾烘弧鐨勫唴瀹逛細琚鎺夊洓瑙掑拰璐磋竟閲戞銆?  inset 26% 鎶婂唴瀹规敹鍒板畨鍏ㄥ尯鐨?~86%锛岀粰杩欏眰缂╂斁鐣欏嚭浣欓噺锛屽崱鐗囦笌 7px 閲戞鎵嶈兘瀹屾暣鏄剧ず銆?-->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标：书本铺满整格，无黑底留边、无金框。
+     前景：整张封面铺满 108dp 画布；背景：同色 #131417 兜底；
+     单色层：只留「阅读」两字。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background>
-        <inset
-            android:drawable="@drawable/ic_launcher_background"
-            android:inset="26%" />
-    </background>
-    <foreground>
-        <inset
-            android:drawable="@drawable/ic_launcher_foreground"
-            android:inset="26%" />
-    </foreground>
-    <monochrome>
-        <inset
-            android:drawable="@drawable/ic_launcher_monochrome"
-            android:inset="26%" />
-    </monochrome>
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

@@ -24,9 +24,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.ui.theme.AppDimens
@@ -36,28 +38,15 @@ import io.legado.app.ui.widget.components.AppBookCover
 private const val SHOW_BOOK_NAME_BELOW = 0
 private const val SHOW_BOOK_NAME_ON_COVER = 2
 
-/** 网格书名：主标题 12sp 单行、副标题 10sp 单行，两行总高恒定 */
+/** 网格书名：两行内 12sp；需要三行时降到 11sp。块高固定三行，格子高度一致 */
 private const val SHELF_GRID_NAME_TEXT_SIZE = 12
 private const val SHELF_GRID_NAME_LINE_HEIGHT = 15
-private const val SHELF_GRID_SUB_TEXT_SIZE = 10
-private const val SHELF_GRID_SUB_LINE_HEIGHT = 13
+private const val SHELF_GRID_NAME_DENSE_TEXT_SIZE = 11
+private const val SHELF_GRID_NAME_DENSE_LINE_HEIGHT = 14
+private const val SHELF_GRID_NAME_MAX_LINES = 3
+private const val SHELF_GRID_NAME_NORMAL_LINES = 2
 private const val SHELF_GRID_OVERLAY_NAME_TEXT_SIZE = 11
 private const val SHELF_GRID_OVERLAY_NAME_LINE_HEIGHT = 14
-
-/**
- * 主标题放不下时逐档降字号。
- *
- * 原实现固定 12sp、两行换行，长书名只能硬断在字中间（"最强毒｜士"）；
- * 现在主标题单行不折，宽度不够先降字号（12 → 11.5 → 11 → 10.5），仍放不下才省略号。
- */
-private val SHELF_GRID_NAME_FONT_STEPS = listOf(
-    SHELF_GRID_NAME_TEXT_SIZE.toFloat(), 11.5f, 11f, 10.5f,
-)
-
-/** 书名主副标题的分隔符：冒号 / 破折号 / 间隔号 / 波浪号 / 括号 / 竖线 */
-private val SHELF_NAME_SPLIT_MARKS = charArrayOf(
-    '：', ':', '—', '－', '～', '·', '｜', '|', '（', '(', '【', '[',
-)
 
 /** 封面底部渐变遮罩，对齐原 bg_gradient_cover（底部黑 63% → 30% 处 38% → 顶部透明） */
 private val gridNameOverlayBrush = Brush.verticalGradient(
@@ -175,49 +164,49 @@ fun BookshelfGridItem(
 }
 
 /**
- * 网格书名：主标题 + 副标题两行。
+ * 网格书名：整名最多三行。
  *
- * 主标题按标点切出（"斗罗大陆：绝世唐门" → 主「斗罗大陆」、副「绝世唐门」），
- * 单行显示、放不下时逐档降字号，仍放不下才省略号；副标题固定 10sp 单行。
- * 两行总高恒定，不同书名之间格子高度不跳。
+ * 上一版按标点把书名拆成「主标题 singleLine + 副标题」两行：主标题只准占一行，
+ * 放不下就从 12sp 逐档降到 10.5sp，再不行就省略号——所以"我，最强毒士…"这类长名
+ * 永远显示不全。现在不拆主副标题，整名按宽度换行：
+ * 两行能装下就用 12sp；要三行才装得下就降到 11sp（行高 14sp）。
+ * 块高固定三行（3 × 14sp），不管书名几行，格子高度都一样、搁板不歪。
  */
 @Composable
 private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
-    val parts = remember(name) { splitShelfName(name) }
-    val measurer = rememberTextMeasurer()
-    val baseStyle = LocalTextStyle.current
     val density = LocalDensity.current
-    // TextUnit 没有加法，两行高度分别换算再相加；随密度缓存，重排时不再重复换算
+    val baseStyle = LocalTextStyle.current
     val blockHeight = remember(density) {
-        with(density) {
-            SHELF_GRID_NAME_LINE_HEIGHT.sp.toDp() + SHELF_GRID_SUB_LINE_HEIGHT.sp.toDp()
-        }
+        with(density) { (SHELF_GRID_NAME_DENSE_LINE_HEIGHT * SHELF_GRID_NAME_MAX_LINES).sp.toDp() }
     }
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
         val widthPx = constraints.maxWidth
-        // 留 2% 余量：测量宽度与真实排版有零点几像素的差，卡在临界上会偶发省略号
-        val limitPx = widthPx.toFloat() * 0.98f
-        val mainFontSize = remember(parts.first, widthPx, baseStyle) {
-            SHELF_GRID_NAME_FONT_STEPS.firstOrNull { step ->
-                measurer.measure(
-                    text = parts.first,
-                    style = baseStyle.copy(fontSize = step.sp),
-                    maxLines = 1,
-                ).size.width <= limitPx
-            } ?: SHELF_GRID_NAME_FONT_STEPS.last()
+        val measurer = rememberTextMeasurer()
+        // 先按 12sp 量一遍：两行装得下就不降字号，否则走三行 11sp
+        val needsThreeLines = remember(name, widthPx, baseStyle) {
+            measurer.measure(
+                text = AnnotatedString(name),
+                style = baseStyle.copy(
+                    fontSize = SHELF_GRID_NAME_TEXT_SIZE.sp,
+                    lineHeight = SHELF_GRID_NAME_LINE_HEIGHT.sp,
+                ),
+                maxLines = Int.MAX_VALUE,
+                softWrap = true,
+                constraints = Constraints(maxWidth = widthPx),
+            ).lineCount > SHELF_GRID_NAME_NORMAL_LINES
         }
-        // 样式随字号缓存：滚动时条目会反复重组，没必要每帧重建两个 TextStyle
-        val mainStyle = remember(mainFontSize, baseStyle) {
-            baseStyle.copy(
-                fontSize = mainFontSize.sp,
-                lineHeight = SHELF_GRID_NAME_LINE_HEIGHT.sp,
-            )
-        }
-        val subStyle = remember(baseStyle) {
-            baseStyle.copy(
-                fontSize = SHELF_GRID_SUB_TEXT_SIZE.sp,
-                lineHeight = SHELF_GRID_SUB_LINE_HEIGHT.sp,
-            )
+        val nameStyle = remember(needsThreeLines, baseStyle) {
+            if (needsThreeLines) {
+                baseStyle.copy(
+                    fontSize = SHELF_GRID_NAME_DENSE_TEXT_SIZE.sp,
+                    lineHeight = SHELF_GRID_NAME_DENSE_LINE_HEIGHT.sp,
+                )
+            } else {
+                baseStyle.copy(
+                    fontSize = SHELF_GRID_NAME_TEXT_SIZE.sp,
+                    lineHeight = SHELF_GRID_NAME_LINE_HEIGHT.sp,
+                )
+            }
         }
         Column(
             modifier = Modifier
@@ -226,40 +215,15 @@ private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = parts.first,
+                text = name,
                 modifier = Modifier.fillMaxWidth(),
-                style = mainStyle,
+                style = nameStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
-                maxLines = 1,
-                softWrap = false,
+                minLines = 1,
+                maxLines = SHELF_GRID_NAME_MAX_LINES,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (parts.second.isNotEmpty()) {
-                Text(
-                    text = parts.second,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = subStyle,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
     }
-}
-
-/** 把书名切成「主标题 to 副标题」，没有分隔符时副标题为空 */
-private fun splitShelfName(raw: String): Pair<String, String> {
-    val text = raw.trim()
-    val index = text.indexOfFirst { char -> SHELF_NAME_SPLIT_MARKS.contains(char) }
-    // 分隔符出现在首位（书名本身以括号开头）时不拆，整体当主标题
-    if (index <= 0) return text to ""
-    val main = text.substring(0, index).trim().trimEnd('，', ',', '、').trim()
-    val sub = text.substring(index).trim().trim(
-        '（', '）', '(', ')', '【', '】', '[', ']', '：', ':', '—', '－', '～', '·', '｜', '|',
-    )
-    return main.ifEmpty { text } to sub
 }
