@@ -26,7 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
@@ -80,16 +84,47 @@ private const val COVER_LOAD_RETRY_DELAY_MS = 1500L
 private const val COVER_LOAD_TIMEOUT_MS = 12_000L
 
 /**
- * 书脊渐层：左侧 3dp 从深到透。
+ * 书脊渐层：左侧 7dp 从深到透，右缘再压一道 1dp 亮线当折页高光。
+ *
+ * 原版 3dp + 0.26 透明度在实机上几乎看不出来（用户反馈"书脊看不出"），这里把宽度翻倍、
+ * 起始浓度提到 0.50，并用一道亮线把书脊的"边缘"勾出来，封面才像一本合着的书。
  *
  * 做成顶层常量而不是在组合里现建：这是按封面相对宽度铺的渐变，与控件尺寸无关，
  * 网格一次滚动要重组几十个条目，省掉每次的 Brush 分配。
  */
 private val COVER_SPINE_BRUSH = Brush.horizontalGradient(
-    0.0f to Color.Black.copy(alpha = 0.26f),
-    0.55f to Color.Black.copy(alpha = 0.10f),
+    0.0f to Color.Black.copy(alpha = 0.50f),
+    0.22f to Color.Black.copy(alpha = 0.30f),
+    0.60f to Color.Black.copy(alpha = 0.12f),
     1.0f to Color.Transparent
 )
+
+/** 书脊右缘的折页高光：宽度 1dp，靠它给书脊一个明确的边界 */
+private val COVER_SPINE_HIGHLIGHT = Color.White.copy(alpha = 0.14f)
+
+/**
+ * 书架封面的落影。
+ *
+ * Android 原生的 elevation 阴影是"软高斯"，铺在山水壁纸这种有纹理的背景上基本糊掉
+ * （用户反馈"阴影厚度不明显、不够立体"）。这里在封面四周自绘四层逐级外扩的圆角矩形，
+ * 并整体下移 2dp，形成一圈可见的"厚度"，再叠原生 elevation 阴影做柔化。
+ * 自绘放在 clip 之前，所以不会被封面圆角裁掉。
+ */
+private fun Modifier.shelfCoverShadow(radius: Dp): Modifier = drawBehind {
+    val corner = radius.toPx()
+    val maxSpread = 4.dp.toPx()
+    val shiftY = 2.dp.toPx()
+    val layers = 4
+    for (i in layers downTo 1) {
+        val spread = maxSpread * i / layers
+        drawRoundRect(
+            color = Color.Black.copy(alpha = 0.07f),
+            topLeft = Offset(-spread, -spread + shiftY),
+            size = Size(size.width + spread * 2, size.height + spread * 2),
+            cornerRadius = CornerRadius(corner + spread),
+        )
+    }
+}
 
 /**
  * 书籍 / 分组封面的 Compose 实现。
@@ -109,7 +144,7 @@ private val COVER_SPINE_BRUSH = Brush.horizontalGradient(
  * @param contentDescription 无障碍描述，一般传书名
  * @param sourceOrigin 书源来源标识，影响网络请求头与图集身份回退
  * @param cornerRadius 封面圆角
- * @param shelfStyle 书架条目样式：左侧书脊渐变 + 1dp 内描边 + 3dp 定向投影。
+ * @param shelfStyle 书架条目样式：左侧 7dp 书脊渐变（带折页高光）+ 1dp 内描边 + 7dp 定向投影。
  *   只给书架（网格 / 列表）开启，搜索结果、书籍详情等封面保持干净的纯图。
  * @param loadOnlyWifi 是否只允许 WiFi 下加载网络封面
  */
@@ -189,15 +224,16 @@ fun AppBookCover(
     Box(
         modifier = modifier
             .then(
-                // 投影画在裁剪之前：clip 之后阴影会被一起裁掉，3dp 定向投影必须落在外层
+                // 投影画在裁剪之前：clip 之后阴影会被一起裁掉，投影必须落在外层。
+                // 浓度一并加重（原 0.16/0.26 在浅色底上薄得看不出厚度）
                 if (shelfStyle && AppConfig.bookCoverShadow) {
                     Modifier.shadow(
                         elevation = AppDimens.bookCoverShadowElevation,
                         shape = RoundedCornerShape(cornerRadius),
                         clip = false,
-                        ambientColor = Color.Black.copy(alpha = 0.16f),
-                        spotColor = Color.Black.copy(alpha = 0.26f),
-                    )
+                        ambientColor = Color.Black.copy(alpha = 0.26f),
+                        spotColor = Color.Black.copy(alpha = 0.45f),
+                    ).then(Modifier.shelfCoverShadow(cornerRadius))
                 } else {
                     Modifier
                 }
@@ -218,15 +254,22 @@ fun AppBookCover(
                 contentScale = ContentScale.Crop
             )
         }
-        // 书脊：左侧 3dp 从深到透的竖向渐层，让封面像一本书而不是一张图
+        // 书脊：左侧 7dp 竖向渐层 + 右缘 1dp 高光，让封面像一本书而不是一张图
         if (shelfStyle) {
-            Box(
+            Canvas(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
                     .width(AppDimens.bookCoverSpineWidth)
-                    .background(COVER_SPINE_BRUSH)
-            )
+            ) {
+                drawRect(brush = COVER_SPINE_BRUSH)
+                val line = 1.dp.toPx()
+                drawRect(
+                    color = COVER_SPINE_HIGHLIGHT,
+                    topLeft = Offset(size.width - line, 0f),
+                    size = Size(line, size.height)
+                )
+            }
         }
         // 有真实图片时只在加载失败后叠加书名；默认封面场景则始终叠加
         if (drawName && !htmlCover && (defaultCoverShown || loadFailed)) {

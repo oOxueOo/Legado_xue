@@ -123,11 +123,11 @@ object AppDimens {
     /** 封面内描边粗细：把封面从背景里"框"出来，避免浅色封面糊在浅色背景上 */
     val bookCoverBorderWidth: Dp = 1.dp
 
-    /** 封面投影高度（向下 3dp 定向投影，配合"显示封面阴影"开关） */
-    val bookCoverShadowElevation: Dp = 3.dp
+    /** 封面投影高度（向下定向投影，配合"显示封面阴影"开关；3dp 时几乎看不出厚度，提到 7dp） */
+    val bookCoverShadowElevation: Dp = 7.dp
 
-    /** 封面左侧书脊渐变的宽度 */
-    val bookCoverSpineWidth: Dp = 3.dp
+    /** 封面左侧书脊渐变的宽度：3dp 太窄看不出折页，提到 7dp */
+    val bookCoverSpineWidth: Dp = 7.dp
 
     /** 封面内嵌阅读进度条与封面左右、下沿的内缩 */
     val shelfCoverProgressInset: Dp = 4.dp
