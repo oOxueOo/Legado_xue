@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
@@ -41,11 +42,13 @@ private const val SHOW_BOOK_NAME_ON_COVER = 2
 /**
  * 网格书名：整名换行，最多三行；三行装不下就逐档降字号，务必显示全名。
  *
- * 关键坑：Compose 的 Text 在"高度不够"时也会加省略号（不只是 maxLines 不够）。
- * 之前块高按 3×14sp=42dp 写死，而 12sp 的书名行高 15sp，三行要 45dp，
- * 于是"实测两行、实际三行"的长名被高度判定溢出，第二行末尾直接变省略号。
- * 现在：行高统一 1.2 倍字号（12sp→14.4sp），块高 46dp，三行最坏 43.2dp，留 2.8dp 余量；
- * 量行时与绘制用同一套样式（显式 letterSpacing=0），避免"量出来两行、画出来三行"。
+ * 关键坑（两次踩过）：Compose 的 Text 在"高度不够"时也会加省略号（不只是 maxLines 不够）。
+ * 所以这里不再给书名块写死高度、也不再限制行数：
+ * - 块高用 heightIn(min = 三行高)：正常 1~3 行的书名叫块高一致（搁板对齐），
+ *   万一行数比预估的多，块自己长高把字装下，绝不出现"…"；
+ * - Text 不设 maxLines（Int.MAX_VALUE）+ overflow=Clip，从根上不产生省略号；
+ * - 行高统一 1.2 倍字号，量行与绘制用同一套样式（显式 letterSpacing=0），
+ *   避免"量出来两行、画出来三行"；两行装得下的用 12sp，否则 11→10.5→10→9.5→9 逐档降。
  */
 private const val SHELF_GRID_NAME_TEXT_SIZE = 12f
 private const val SHELF_GRID_NAME_MAX_LINES = 3
@@ -53,7 +56,7 @@ private const val SHELF_GRID_NAME_NORMAL_LINES = 2
 /** 三行时的降字号台阶：11 → 10.5 → 10 → 9.5 → 9，取第一个能三行装下的 */
 private val SHELF_GRID_NAME_DENSE_STEPS = floatArrayOf(11f, 10.5f, 10f, 9.5f, 9f)
 private const val SHELF_GRID_NAME_LINE_HEIGHT_RATIO = 1.2f
-/** 书名块高：按三行 15sp 留足余量，任何字号三行都装得下，不会被高度截断 */
+/** 书名块的最小高度：按三行 1.2 倍行高留余量；只当下限，内容更多时块会自动长高 */
 private const val SHELF_GRID_NAME_BLOCK_HEIGHT_SP = 46f
 private const val SHELF_GRID_OVERLAY_NAME_TEXT_SIZE = 11
 private const val SHELF_GRID_OVERLAY_NAME_LINE_HEIGHT = 14
@@ -174,14 +177,18 @@ fun BookshelfGridItem(
 }
 
 /**
- * 网格书名：整名最多三行，尽量不省略。
+ * 网格书名：整名换行显示，不允许出现省略号。
  *
- * 早先按标点把书名拆成「主标题 singleLine + 副标题」，主标题只准一行，长名必然省略号；
- * 之后改成整名换行，但块高只按 3×14sp=42dp 留，而 12sp 的行高 15sp 三行要 45dp，
- * 只要"量出来两行、画出来三行"就会被高度判定溢出，第二行末尾变省略号
- * （"用九千万亿警用金在缅北开派出所"就是这么被截的）。
- * 现在：行高统一 1.2 倍字号，块高 46dp（三行最坏 43.2dp，留余量），
- * 量行与绘制用同一套样式（显式 letterSpacing=0），两行装得下用 12sp，否则逐档降到能三行装下的字号。
+ * 踩过两次坑：
+ * 1) 早先按标点把书名拆成「主标题 singleLine + 副标题」，主标题只准一行，长名必然省略号；
+ * 2) 后来改成整名换行，但给书名块写死了高度（42dp / 46dp）——Compose 的 Text
+ *    在"高度不够"时也会加省略号，只要"量出来两行、画出来三行"就会被截
+ *    （"用九千万亿警用金在缅北开派出所"就是这么被截的）。
+ *
+ * 现在的做法是从根上不让它截：书名块只给下限（三行高），不设上限，内容多就自己长高；
+ * Text 不设 maxLines（Int.MAX_VALUE）+ overflow=Clip，任何情况下都不产生省略号；
+ * 行高统一 1.2 倍字号，量行与绘制共用同一套样式（显式 letterSpacing=0），
+ * 两行装得下用 12sp，否则按 11→10.5→10→9.5→9 逐档降到能三行装下的字号。
  */
 @Composable
 private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
@@ -222,7 +229,8 @@ private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(blockHeight),
+                // 只当下限：正常行数时块高统一（搁板对齐），行数超预期时自己长高，不截字
+                .heightIn(min = blockHeight),
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
@@ -231,9 +239,8 @@ private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
                 style = nameStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
-                minLines = 1,
-                maxLines = SHELF_GRID_NAME_MAX_LINES,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = Int.MAX_VALUE,
+                overflow = TextOverflow.Clip,
             )
         }
     }
