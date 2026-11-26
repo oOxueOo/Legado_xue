@@ -210,17 +210,11 @@ data class Asset(
 /**
  * GitHub 发布包直链在国内经常连不上（表现为 App 内「下载失败」），统一改成走镜像前缀；
  * 镜像返回 302 跳回真实文件，下载端会跟随重定向。
+ *
+ * 具体挂哪个前缀交给 [GithubMirror]：检测更新时已经试出了能用的镜像，下载直接复用同一个，
+ * 不会再出现「检测通了、下载仍指向失效镜像」。
  */
-private const val GITHUB_MIRROR = "https://gh-proxy.com/"
-
-private fun mirrorUrl(raw: String): String {
-    if (raw.startsWith(GITHUB_MIRROR)) return raw
-    return if (raw.contains("github.com") || raw.contains("githubusercontent.com")) {
-        GITHUB_MIRROR + raw
-    } else {
-        raw
-    }
-}
+private fun mirrorUrl(raw: String): String = GithubMirror.mirror(raw)
 
 @Keep
 data class GiteeAsset(

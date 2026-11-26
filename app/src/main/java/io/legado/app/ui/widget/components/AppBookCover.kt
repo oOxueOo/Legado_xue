@@ -9,9 +9,12 @@ import android.text.TextPaint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -20,8 +23,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -74,6 +79,18 @@ private const val COVER_LOAD_RETRY_DELAY_MS = 1500L
 private const val COVER_LOAD_TIMEOUT_MS = 12_000L
 
 /**
+ * 书脊渐层：左侧 3dp 从深到透。
+ *
+ * 做成顶层常量而不是在组合里现建：这是按封面相对宽度铺的渐变，与控件尺寸无关，
+ * 网格一次滚动要重组几十个条目，省掉每次的 Brush 分配。
+ */
+private val COVER_SPINE_BRUSH = Brush.horizontalGradient(
+    0.0f to Color.Black.copy(alpha = 0.26f),
+    0.55f to Color.Black.copy(alpha = 0.10f),
+    1.0f to Color.Transparent
+)
+
+/**
  * 书籍 / 分组封面的 Compose 实现。
  *
  * 与 View 版 `CoverImageView` 保持同一套取图优先级，顺序不能调换：
@@ -91,6 +108,8 @@ private const val COVER_LOAD_TIMEOUT_MS = 12_000L
  * @param contentDescription 无障碍描述，一般传书名
  * @param sourceOrigin 书源来源标识，影响网络请求头与图集身份回退
  * @param cornerRadius 封面圆角
+ * @param shelfStyle 书架条目样式：左侧书脊渐变 + 1dp 内描边 + 3dp 定向投影。
+ *   只给书架（网格 / 列表）开启，搜索结果、书籍详情等封面保持干净的纯图。
  * @param loadOnlyWifi 是否只允许 WiFi 下加载网络封面
  */
 @Composable
@@ -103,6 +122,7 @@ fun AppBookCover(
     contentDescription: String?,
     sourceOrigin: String? = null,
     cornerRadius: Dp = AppDimens.bookCoverCornerRadius,
+    shelfStyle: Boolean = false,
     loadOnlyWifi: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -122,8 +142,10 @@ fun AppBookCover(
     val defaultCoverShown = !htmlCover && (realPath == null || useDefaultCover)
 
     var bounds by remember { mutableStateOf(IntSize.Zero) }
-    val requestKey = listOf(realPath, sourceOrigin, htmlCover, useDefaultCover, name, author)
-        .joinToString("|")
+    // 拼请求键：滚动时条目会大量重组，用 remember 挡住每次的 list/字符串分配
+    val requestKey = remember(realPath, sourceOrigin, htmlCover, useDefaultCover, name, author) {
+        "$realPath|$sourceOrigin|$htmlCover|$useDefaultCover|$name|$author"
+    }
     // 图集命中时 realPath 是图集里的图，失败后要退回的"真实封面"就是用户书源的封面地址
     val fallbackPath = coverPath?.takeIf { it.isNotBlank() && it != realPath }
     // 初值就是默认封面：与 View 版 placeholder(defaultDrawable) 一致，避免加载期间露出壁纸
@@ -165,6 +187,20 @@ fun AppBookCover(
 
     Box(
         modifier = modifier
+            .then(
+                // 投影画在裁剪之前：clip 之后阴影会被一起裁掉，3dp 定向投影必须落在外层
+                if (shelfStyle && AppConfig.bookCoverShadow) {
+                    Modifier.shadow(
+                        elevation = AppDimens.bookCoverShadowElevation,
+                        shape = RoundedCornerShape(cornerRadius),
+                        clip = false,
+                        ambientColor = Color.Black.copy(alpha = 0.16f),
+                        spotColor = Color.Black.copy(alpha = 0.26f),
+                    )
+                } else {
+                    Modifier
+                }
+            )
             .clip(RoundedCornerShape(cornerRadius))
             .background(
                 if (AppConfig.bookCoverShadow) MaterialTheme.colorScheme.background
@@ -181,6 +217,16 @@ fun AppBookCover(
                 contentScale = ContentScale.Crop
             )
         }
+        // 书脊：左侧 3dp 从深到透的竖向渐层，让封面像一本书而不是一张图
+        if (shelfStyle) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .width(AppDimens.bookCoverSpineWidth)
+                    .background(COVER_SPINE_BRUSH)
+            )
+        }
         // 有真实图片时只在加载失败后叠加书名；默认封面场景则始终叠加
         if (drawName && !htmlCover && (defaultCoverShown || loadFailed)) {
             BookCoverTextOverlay(
@@ -188,6 +234,18 @@ fun AppBookCover(
                 author = author.orEmpty(),
                 drawAuthor = BookCover.drawBookAuthor,
                 modifier = Modifier.fillMaxSize()
+            )
+        }
+        // 内描边最后画，压住图片与书名叠层的边缘毛边
+        if (shelfStyle) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(
+                        width = AppDimens.bookCoverBorderWidth,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(cornerRadius),
+                    )
             )
         }
     }
@@ -209,13 +267,16 @@ internal fun BookCoverTextOverlay(
     // 描边取主题背景色、文字取强调色，与 View 版 generateCoverBitmap 的取色一致
     val bgColor = MaterialTheme.colorScheme.background.toArgb()
     val accentColor = MaterialTheme.colorScheme.primary.toArgb()
+    // 画笔复用：Canvas 的绘制 lambda 每帧都会跑，原来在里面 new 两个 TextPaint 是每帧一分配
+    val namePaint = remember { TextPaint() }
+    val authorPaint = remember { TextPaint() }
 
     Canvas(modifier = modifier) {
         val viewWidth = size.width
         val viewHeight = size.height
         val canvas = drawContext.canvas.nativeCanvas
 
-        val namePaint = TextPaint().apply {
+        namePaint.apply {
             typeface = Typeface.DEFAULT_BOLD
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
@@ -254,8 +315,10 @@ internal fun BookCoverTextOverlay(
         }
 
         if (drawAuthor && author.isNotBlank()) {
-            val authorPaint = TextPaint(namePaint).apply {
+            authorPaint.apply {
                 typeface = Typeface.DEFAULT
+                isAntiAlias = true
+                textAlign = Paint.Align.CENTER
                 textSize = viewWidth / 10f
                 strokeWidth = textSize / 5f
             }

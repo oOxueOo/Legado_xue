@@ -29,7 +29,10 @@ class NameListPreference(context: Context, attrs: AttributeSet) : ListPreference
             R.id.text_view, isBottomBackground = isBottomBackground
         )
         if (v is TextView) {
-            v.text = entry
+            // 选项文案常带「主名（补充说明）」的长尾巴，整段塞进右侧胶囊会把左侧标题挤成「书架图…」。
+            // 这里只显示主名，完整文案留给弹窗列表和 contentDescription。
+            v.text = shortEntry(entry)
+            v.contentDescription = entry
             if (isBottomBackground) {
                 val bgColor = context.bottomBackground
                 val pTextColor = context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
@@ -37,6 +40,15 @@ class NameListPreference(context: Context, attrs: AttributeSet) : ListPreference
             }
         }
         super.onBindViewHolder(holder)
+    }
+
+    /** 取「主名（说明）」里的主名；主名仍过长时截断 */
+    private fun shortEntry(entry: CharSequence?): CharSequence {
+        val s = entry?.toString()?.trim().orEmpty()
+        if (s.isEmpty()) return s
+        val head = s.substringBefore('（').substringBefore('(').trim()
+        val base = head.ifEmpty { s }
+        return if (base.length > 8) base.take(7) + "…" else base
     }
 
 }

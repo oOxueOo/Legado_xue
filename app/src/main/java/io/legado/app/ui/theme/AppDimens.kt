@@ -112,8 +112,28 @@ object AppDimens {
 
     // ── 书籍封面（AppBookCover）──
 
-    /** 封面圆角，对齐 View 版 CoverImageView 的 12px 描边圆角 */
-    val bookCoverCornerRadius: Dp = 4.dp
+    /**
+     * 封面圆角。
+     *
+     * 原 4dp 取自 View 版 CoverImageView 的 12px 描边圆角，放到网格里几乎看不出圆角，
+     * 整屏像缩略图墙；统一提到 8dp，列表封面与网格封面同一套观感。
+     */
+    val bookCoverCornerRadius: Dp = 8.dp
+
+    /** 封面内描边粗细：把封面从背景里"框"出来，避免浅色封面糊在浅色背景上 */
+    val bookCoverBorderWidth: Dp = 1.dp
+
+    /** 封面投影高度（向下 3dp 定向投影，配合"显示封面阴影"开关） */
+    val bookCoverShadowElevation: Dp = 3.dp
+
+    /** 封面左侧书脊渐变的宽度 */
+    val bookCoverSpineWidth: Dp = 3.dp
+
+    /** 封面内嵌阅读进度条与封面左右、下沿的内缩 */
+    val shelfCoverProgressInset: Dp = 4.dp
+
+    /** 封面内嵌阅读进度条的圆角（进度条高 2dp，2dp 圆角即圆头） */
+    val shelfCoverProgressCorner: Dp = 2.dp
 
     // ── 书架条目（列表 / 网格，尺寸对齐原 item_bookshelf_* 布局）──
 
@@ -257,6 +277,34 @@ object AppDimens {
 
     /** 读取进度轨道的透明度（对齐 View 侧 25% 强调色轨道） */
     const val SHELF_PROGRESS_TRACK_ALPHA = 0.25f
+
+    // ── 网格搁板（书架造型方案 B：一层木架板，不做整面书柜）──
+
+    /**
+     * 搁板高度。
+     *
+     * 5dp：低于 4dp 像一条分隔线，高于 6dp 开始像抽屉面。
+     */
+    val shelfBoardHeight: Dp = 5.dp
+
+    /**
+     * 搁板下方投影高度。
+     *
+     * 15dp 渐变：板要有"落点"，只靠 1dp 底边在浅色主题上会被看成装饰线。
+     */
+    val shelfBoardShadow: Dp = 15.dp
+
+    /** 搁板左右越出条目边界的一半列距，相邻两块拼成一条连续板 */
+    val shelfBoardOverhang: Dp = 6.dp
+
+    /** 搁板占用的竖向空间 = 板高 + 投影，网格行距至少要留这么多 */
+    val shelfBoardSpace: Dp = shelfBoardHeight + shelfBoardShadow
+
+    /** 墨水屏的搁板退化为 1dp 线：渐变和投影在电子墨水上看不出层次，只会糊成灰块 */
+    val shelfBoardLineWidth: Dp = 1.dp
+
+    /** 墨水屏下搁板占用的竖向空间（线宽 + 一点呼吸位） */
+    val shelfBoardLineSpace: Dp = 8.dp
 
     /** 封面宽高比：书本封面高度 = 宽度 × 该系数（对齐 CoverImageView 的 4/3） */
     const val BOOK_COVER_ASPECT = 4f / 3f

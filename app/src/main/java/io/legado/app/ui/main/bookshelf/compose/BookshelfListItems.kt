@@ -239,6 +239,7 @@ private fun RowScope.BookshelfItemCover(bookItem: BookshelfBookItem, width: Dp) 
         galleryIdentity = bookItem.display.bookUrl,
         sourceOrigin = bookItem.display.origin,
         contentDescription = bookItem.display.name,
+        shelfStyle = true,
     )
 }
 

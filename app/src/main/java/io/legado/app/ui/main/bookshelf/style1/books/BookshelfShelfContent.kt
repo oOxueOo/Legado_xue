@@ -151,6 +151,10 @@ private fun BookshelfGridContent(
 ) {
     val gridState = rememberLazyGridState()
     val spacing = rememberShelfSpacing(displayConfig.marginPx, bottomPaddingPx)
+    // 行距要能容下搁板：板 5dp + 投影 15dp 都画在条目底部之下，间距不足时板会压到下一行封面
+    val shelfBoardSpace =
+        if (AppConfig.isEInkMode) AppDimens.shelfBoardLineSpace else AppDimens.shelfBoardSpace
+    val rowSpacing = maxOf(spacing.itemSpacing, shelfBoardSpace)
     val scrollbarBottomInset = with(LocalDensity.current) { bottomPaddingPx.toDp() }
     val canScrollBack by remember {
         derivedStateOf {
@@ -181,12 +185,13 @@ private fun BookshelfGridContent(
                 bottom = spacing.bottomPadding,
             ),
             horizontalArrangement = Arrangement.spacedBy(spacing.itemSpacing),
-            verticalArrangement = Arrangement.spacedBy(spacing.itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             items(items = shelfItems, key = { it.key }) { bookItem ->
                 BookshelfGridItem(
                     bookItem = bookItem,
                     displayConfig = displayConfig,
+                    boardOverhang = spacing.itemSpacing / 2,
                     onClick = onBookClick,
                     onLongClick = onBookLongClick,
                 )

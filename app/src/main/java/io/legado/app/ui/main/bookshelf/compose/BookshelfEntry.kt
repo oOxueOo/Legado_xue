@@ -168,5 +168,6 @@ private fun FolderCover(modifier: Modifier, folder: BookshelfFolderItem) {
         coverPath = folder.cover,
         galleryIdentity = BookshelfFolderItem.coverGalleryIdentity(folder.groupId),
         contentDescription = folder.name,
+        shelfStyle = true,
     )
 }
