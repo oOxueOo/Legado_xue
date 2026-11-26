@@ -126,8 +126,12 @@ object AppDimens {
     /** 封面投影高度（向下定向投影，配合"显示封面阴影"开关；3dp 时几乎看不出厚度，提到 7dp） */
     val bookCoverShadowElevation: Dp = 7.dp
 
-    /** 封面左侧书脊渐变的宽度：3dp 太窄看不出折页，提到 7dp */
-    val bookCoverSpineWidth: Dp = 7.dp
+    /** 封面左侧书脊渐变的宽度：拟物书脊 12dp，要能放下竹节压脊线 */
+    val bookCoverSpineWidth: Dp = 12.dp
+
+    /** 纸页块：右/底露出的一薄一厚（封面内侧被裁掉的部分） */
+    val bookCoverPageBase: Dp = 3.dp
+    val bookCoverPageGrow: Dp = 5.dp
 
     /** 封面内嵌阅读进度条与封面左右、下沿的内缩 */
     val shelfCoverProgressInset: Dp = 4.dp
