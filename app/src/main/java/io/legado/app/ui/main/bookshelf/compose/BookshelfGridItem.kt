@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,12 +24,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.widget.components.AppBookCover
@@ -39,25 +34,11 @@ import io.legado.app.ui.widget.components.AppBookCover
 private const val SHOW_BOOK_NAME_BELOW = 0
 private const val SHOW_BOOK_NAME_ON_COVER = 2
 
-/**
- * 网格书名：整名换行，最多三行；三行装不下就逐档降字号，务必显示全名。
- *
- * 关键坑（两次踩过）：Compose 的 Text 在"高度不够"时也会加省略号（不只是 maxLines 不够）。
- * 所以这里不再给书名块写死高度、也不再限制行数：
- * - 块高用 heightIn(min = 三行高)：正常 1~3 行的书名叫块高一致（搁板对齐），
- *   万一行数比预估的多，块自己长高把字装下，绝不出现"…"；
- * - Text 不设 maxLines（Int.MAX_VALUE）+ overflow=Clip，从根上不产生省略号；
- * - 行高统一 1.2 倍字号，量行与绘制用同一套样式（显式 letterSpacing=0），
- *   避免"量出来两行、画出来三行"；两行装得下的用 12sp，否则 11→10.5→10→9.5→9 逐档降。
- */
+/** 网格书名：字号 12sp、行高 1.2 倍、行数不设上限，书名块至少两行高（见 BookshelfGridName） */
 private const val SHELF_GRID_NAME_TEXT_SIZE = 12f
-private const val SHELF_GRID_NAME_MAX_LINES = 3
-private const val SHELF_GRID_NAME_NORMAL_LINES = 2
-/** 三行时的降字号台阶：11 → 10.5 → 10 → 9.5 → 9，取第一个能三行装下的 */
-private val SHELF_GRID_NAME_DENSE_STEPS = floatArrayOf(11f, 10.5f, 10f, 9.5f, 9f)
 private const val SHELF_GRID_NAME_LINE_HEIGHT_RATIO = 1.2f
-/** 书名块的最小高度：按三行 1.2 倍行高留余量；只当下限，内容更多时块会自动长高 */
-private const val SHELF_GRID_NAME_BLOCK_HEIGHT_SP = 46f
+/** 书名块的最小高度：两行。只当下限，书名更长时块自动长高 */
+private const val SHELF_GRID_NAME_MIN_LINES = 2f
 private const val SHELF_GRID_OVERLAY_NAME_TEXT_SIZE = 11
 private const val SHELF_GRID_OVERLAY_NAME_LINE_HEIGHT = 14
 
@@ -80,7 +61,6 @@ fun BookshelfGridItem(
     modifier: Modifier = Modifier,
     bookItem: BookshelfBookItem,
     displayConfig: BookshelfDisplayConfig,
-    boardOverhang: Dp = AppDimens.shelfBoardOverhang,
     onClick: (BookshelfBookItem) -> Unit,
     onLongClick: (BookshelfBookItem) -> Unit,
 ) {
@@ -91,9 +71,6 @@ fun BookshelfGridItem(
                 onClick = { onClick(bookItem) },
                 onLongClick = { onLongClick(bookItem) },
             )
-            // 搁板画在条目底边之下、向下溢进行距：绘制区取整格（含内边距），
-            // 左右各越出半个列距，与邻格的板严丝合缝拼成一条
-            .shelfBoard(overhang = boardOverhang)
             .padding(AppDimens.shelfGridItemPadding),
     ) {
         Box {
@@ -177,71 +154,47 @@ fun BookshelfGridItem(
 }
 
 /**
- * 网格书名：整名换行显示，不允许出现省略号。
+ * 网格书名：整名换行，行数不设上限，绝不加省略号。
  *
- * 踩过两次坑：
- * 1) 早先按标点把书名拆成「主标题 singleLine + 副标题」，主标题只准一行，长名必然省略号；
- * 2) 后来改成整名换行，但给书名块写死了高度（42dp / 46dp）——Compose 的 Text
- *    在"高度不够"时也会加省略号，只要"量出来两行、画出来三行"就会被截
- *    （"用九千万亿警用金在缅北开派出所"就是这么被截的）。
- *
- * 现在的做法是从根上不让它截：书名块只给下限（三行高），不设上限，内容多就自己长高；
- * Text 不设 maxLines（Int.MAX_VALUE）+ overflow=Clip，任何情况下都不产生省略号；
- * 行高统一 1.2 倍字号，量行与绘制共用同一套样式（显式 letterSpacing=0），
- * 两行装得下用 12sp，否则按 11→10.5→10→9.5→9 逐档降到能三行装下的字号。
+ * 走过的弯路：早先拆「主标题 + 副标题」，主标题只准一行；后来整名换行却给书名块写死高度
+ * （42dp / 46dp），而 Compose 的 Text 在"高度不够"时也会加省略号，长名第三行被截
+ * （"用九千万亿警用金在缅北开派出所"就是这么被截的）。
+ * 现在：字号固定 12sp、行高 1.2 倍、量行与绘制同一套样式（显式 letterSpacing=0），
+ * 行数不设上限（maxLines=Int.MAX_VALUE + Clip），书名块只给两行高的下限、内容多就自己长高；
+ * 纵向留白交给「书架间距」设置：间距调大，长书名可以舒舒服服显示三四行，不靠缩字号硬塞。
  */
 @Composable
 private fun BookshelfGridName(name: String, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val baseStyle = LocalTextStyle.current
-    val blockHeight = remember(density) {
-        with(density) { SHELF_GRID_NAME_BLOCK_HEIGHT_SP.sp.toDp() }
+    val minHeight = remember(density) {
+        with(density) {
+            (SHELF_GRID_NAME_TEXT_SIZE * SHELF_GRID_NAME_LINE_HEIGHT_RATIO * SHELF_GRID_NAME_MIN_LINES)
+                .sp.toDp()
+        }
     }
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val widthPx = constraints.maxWidth
-        val measurer = rememberTextMeasurer()
-        val nameStyle = remember(name, widthPx, baseStyle) {
-            // 量行与绘制必须同一套样式：显式给 letterSpacing，避免主题默认字距把行数算少
-            fun styleOf(size: Float) = baseStyle.copy(
-                fontSize = size.sp,
-                lineHeight = (size * SHELF_GRID_NAME_LINE_HEIGHT_RATIO).sp,
-                letterSpacing = 0.sp,
-            )
-            fun linesAt(size: Float): Int = measurer.measure(
-                text = AnnotatedString(name),
-                style = styleOf(size),
-                maxLines = Int.MAX_VALUE,
-                softWrap = true,
-                constraints = Constraints(maxWidth = widthPx),
-            ).lineCount
-
-            val size = when {
-                // 两行内就用标准字号
-                linesAt(SHELF_GRID_NAME_TEXT_SIZE) <= SHELF_GRID_NAME_NORMAL_LINES ->
-                    SHELF_GRID_NAME_TEXT_SIZE
-                // 需要三行：逐档降字号，取第一个能装下三行的
-                else -> SHELF_GRID_NAME_DENSE_STEPS.firstOrNull {
-                    linesAt(it) <= SHELF_GRID_NAME_MAX_LINES
-                } ?: SHELF_GRID_NAME_DENSE_STEPS.last()
-            }
-            styleOf(size)
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 只当下限：正常行数时块高统一（搁板对齐），行数超预期时自己长高，不截字
-                .heightIn(min = blockHeight),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = name,
-                modifier = Modifier.fillMaxWidth(),
-                style = nameStyle,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                maxLines = Int.MAX_VALUE,
-                overflow = TextOverflow.Clip,
-            )
-        }
+    val nameStyle = remember(baseStyle) {
+        baseStyle.copy(
+            fontSize = SHELF_GRID_NAME_TEXT_SIZE.sp,
+            lineHeight = (SHELF_GRID_NAME_TEXT_SIZE * SHELF_GRID_NAME_LINE_HEIGHT_RATIO).sp,
+            // 主题可能带字距，这里显式清零，行宽与设计一致
+            letterSpacing = 0.sp,
+        )
+    }
+    Column(
+        modifier = modifier
+            // 只当下限：短名（1~2 行）块高统一，长名自己长高，永远不截字
+            .heightIn(min = minHeight),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = name,
+            modifier = Modifier.fillMaxWidth(),
+            style = nameStyle,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = Int.MAX_VALUE,
+            overflow = TextOverflow.Clip,
+        )
     }
 }

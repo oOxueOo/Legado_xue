@@ -173,10 +173,8 @@ private fun BookshelfGridContent(
     onEntryLongClick: (BookshelfEntry) -> Unit,
 ) {
     val spacing = rememberShelfSpacing(displayConfig.marginPx, bottomPaddingPx)
-    // 行距要能容下搁板：板 5dp + 投影 15dp 都画在条目底部之下，间距不足时板会压到下一行封面
-    val shelfBoardSpace =
-        if (AppConfig.isEInkMode) AppDimens.shelfBoardLineSpace else AppDimens.shelfBoardSpace
-    val rowSpacing = maxOf(spacing.itemSpacing, shelfBoardSpace)
+    // 搁板已取消：行距直接用用户设置里的书架间距，间距调大后书名可多显示几行
+    val rowSpacing = spacing.itemSpacing
     val scrollbarBottomInset = with(LocalDensity.current) { bottomPaddingPx.toDp() }
     // 同 BookshelfListContent：以 listState 为 key，避免分组切换后回调观察旧状态实例
     val canScrollBack by remember(listState) {
@@ -223,7 +221,6 @@ private fun BookshelfGridContent(
                 BookshelfEntryItem(
                     entry = entry,
                     displayConfig = displayConfig,
-                    boardOverhang = spacing.itemSpacing / 2,
                     onClick = onEntryClick,
                     onLongClick = onEntryLongClick,
                 )
@@ -243,7 +240,6 @@ private fun BookshelfGridContent(
 private fun BookshelfEntryItem(
     entry: BookshelfEntry,
     displayConfig: BookshelfDisplayConfig,
-    boardOverhang: Dp = AppDimens.shelfBoardOverhang,
     onClick: (BookshelfEntry) -> Unit,
     onLongClick: (BookshelfEntry) -> Unit,
 ) {
@@ -252,7 +248,6 @@ private fun BookshelfEntryItem(
             BookshelfGridItem(
                 bookItem = entry.book,
                 displayConfig = displayConfig,
-                boardOverhang = boardOverhang,
                 onClick = { onClick(entry) },
                 onLongClick = { onLongClick(entry) },
             )
