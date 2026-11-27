@@ -60,29 +60,19 @@ internal suspend fun loadBookshelfTagBarData(
 
 /**
  * 缓存键：结果只与「书本标签列（[tagSourceRevision]）+ 智能标签配置（[SmartTagConfig.revision]、
- * 总开关）+ 该分组的标签/隐藏标签偏好 + 用户分组位掩码」有关，这些都能用廉价值表达，
+ * 总开关）+ 该分组的标签/隐藏标签偏好」有关，这些都能用廉价值表达，
  * 不必真的把全表标签算一遍。
- *
- * 位掩码只为「网络未分组 / 本地未分组」参与判定（见 [filterBookshelfTagInfosByGroup]），
- * 其余分组传 0 以避免多余的分组表查询；这两个分组读一次小表也很便宜。
  */
 private fun tagBarCacheKey(groupId: Long): String {
-    val needMask = groupId == BookGroup.IdNetNone || groupId == BookGroup.IdLocalNone
     return buildString {
         append(groupId).append('|')
         append(tagSourceRevision).append('|')
         append(SmartTagConfig.revision).append('|')
         append(SmartTagConfig.isEnabled(appCtx)).append('|')
         append(appCtx.getPrefString(PreferKey.bookshelfGroupTags)).append('|')
-        append(appCtx.getPrefString(PreferKey.bookshelfHiddenTags)).append('|')
-        if (needMask) append(userGroupMask())
+        append(appCtx.getPrefString(PreferKey.bookshelfHiddenTags))
     }
 }
-
-/** 用户分组位掩码（正 groupId 的并集），"未分组"判定与标签栏缓存键共用 */
-private fun userGroupMask(): Long = appDb.bookGroupDao.all
-    .filter { it.groupId > 0 }
-    .fold(0L) { acc, group -> acc or group.groupId }
 
 private fun computeBookshelfTagBarData(
     context: Context,
@@ -204,32 +194,17 @@ internal fun filterBookshelfTagInfosByGroup(
     groupId: Long,
 ): List<BookTagInfo> = when (groupId) {
     BookGroup.IdAll -> books
+    BookGroup.IdText -> books.filter {
+        it.type and BookType.text > 0 &&
+            it.type and (BookType.audio or BookType.video or BookType.image) == 0
+    }
     BookGroup.IdLocal -> books.filter { it.type and BookType.local > 0 }
     BookGroup.IdAudio -> books.filter { it.type and BookType.audio > 0 }
     BookGroup.IdVideo -> books.filter { it.type and BookType.video > 0 }
-    BookGroup.IdError -> books.filter { it.type and BookType.updateError > 0 }
-    else -> {
-        val userGroupMask = userGroupMask()
-        when (groupId) {
-            BookGroup.IdNetNone -> books.filter {
-                it.type and BookType.audio == 0 &&
-                    it.type and BookType.video == 0 &&
-                    it.type and BookType.local == 0 &&
-                    (it.group and userGroupMask) == 0L
-            }
-
-            BookGroup.IdLocalNone -> books.filter {
-                it.type and BookType.audio == 0 &&
-                    it.type and BookType.video == 0 &&
-                    it.type and BookType.local > 0 &&
-                    (it.group and userGroupMask) == 0L
-            }
-
-            else -> if (groupId > 0) {
-                books.filter { it.group and groupId > 0 }
-            } else {
-                emptyList()
-            }
-        }
+    BookGroup.IdImage -> books.filter { it.type and BookType.image > 0 }
+    else -> if (groupId > 0) {
+        books.filter { it.group and groupId > 0 }
+    } else {
+        emptyList()
     }
 }

@@ -15,6 +15,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
+import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -83,6 +84,7 @@ import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.openInputStream
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.toastOnUi
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers.Main
@@ -1481,33 +1483,28 @@ object Restore {
     }
 
     private fun ensureDefaultBookGroups() {
+        // 6 个基础筛选分组：只补缺失的行，绝不改写已存在行的 order（否则会打乱用户手动排序）
         val defaults = arrayOf(
             BookGroup(BookGroup.IdAll, appCtx.getString(R.string.all), order = -10, show = true),
             BookGroup(
+                BookGroup.IdText,
+                appCtx.getString(R.string.book_group_novel),
+                order = -9,
+                show = true,
+            ),
+            BookGroup(
                 BookGroup.IdLocal,
                 appCtx.getString(R.string.local),
-                order = -9,
+                order = -8,
                 enableRefresh = false,
                 show = true,
             ),
-            BookGroup(BookGroup.IdAudio, appCtx.getString(R.string.audio), order = -8, show = true),
+            BookGroup(BookGroup.IdAudio, appCtx.getString(R.string.audio), order = -7, show = true),
+            BookGroup(BookGroup.IdVideo, appCtx.getString(R.string.video), order = -6, show = true),
             BookGroup(
-                BookGroup.IdNetNone,
-                appCtx.getString(R.string.net_no_group),
-                order = -7,
-                show = true,
-            ),
-            BookGroup(
-                BookGroup.IdLocalNone,
-                appCtx.getString(R.string.local_no_group),
-                order = -6,
-                show = false,
-            ),
-            BookGroup(BookGroup.IdVideo, appCtx.getString(R.string.video), order = -5, show = true),
-            BookGroup(
-                BookGroup.IdError,
-                appCtx.getString(R.string.update_book_fail),
-                order = -1,
+                BookGroup.IdImage,
+                appCtx.getString(R.string.book_group_manga),
+                order = -5,
                 show = true,
             ),
         ).filter { appDb.bookGroupDao.getByID(it.groupId) == null }
@@ -1515,6 +1512,8 @@ object Restore {
         if (defaults.isNotEmpty()) {
             appDb.bookGroupDao.insert(*defaults.toTypedArray())
         }
+        // 恢复备份后标记「分组清理」已完成，避免下次启动把备份里带回来的自建分组又删掉
+        appCtx.putPrefBoolean(AppDatabase.PREF_BOOK_GROUP_RESET_DONE, true)
     }
 
     private fun resolveBackupCacheDir(path: String, cacheIndexList: List<BookCacheIndex>): File? {

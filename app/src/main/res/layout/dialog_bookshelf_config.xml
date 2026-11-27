@@ -251,6 +251,13 @@
                 tools:ignore="RtlSymmetry" />
         </LinearLayout>
 
+        <!-- 段落留白：固定 16dp 占位，与开关的显隐无关 -->
+        <View
+            android:id="@+id/view_section_gap"
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            app:layout_constraintTop_toBottomOf="@+id/ll_folder_view" />
+
 
 
         <!-- ============ 第二段：开关 ============ -->
@@ -259,12 +266,11 @@
             android:id="@+id/sw_dropdown_select_group"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:paddingVertical="8dp"
             android:text="@string/dropdown_select_group"
             android:textSize="14sp"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@+id/ll_folder_view"
+            app:layout_constraintTop_toBottomOf="@+id/view_section_gap"
             tools:ignore="TouchTargetSizeCheck" />
 
 
@@ -278,7 +284,6 @@
             android:text="@string/show_book_border"
             android:textSize="14sp"
             android:visibility="gone"
-            app:layout_goneMarginTop="8dp"
             app:layout_constraintTop_toBottomOf="@+id/sw_dropdown_select_group"
             tools:ignore="TouchTargetSizeCheck" />
 
@@ -292,7 +297,6 @@
             android:paddingVertical="8dp"
             android:text="@string/show_bookshelf_tag_bar"
             android:textSize="14sp"
-            app:layout_goneMarginTop="8dp"
             app:layout_constraintTop_toBottomOf="@+id/sw_show_book_border"
             tools:ignore="TouchTargetSizeCheck" />
 
@@ -400,7 +404,6 @@
             android:paddingVertical="8dp"
             android:text="@string/show_unread"
             android:textSize="14sp"
-            app:layout_goneMarginTop="8dp"
             app:layout_constraintTop_toBottomOf="@+id/ll_show_more_info"
             tools:ignore="TouchTargetSizeCheck" />
 
@@ -450,7 +453,7 @@
             android:id="@+id/margin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:layout_marginBottom="24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/sw_show_wait_up_books"

@@ -52,6 +52,8 @@
     <string name="out_favorites">Not in Favorites</string>
     <string name="rss">RSS feeds</string>
     <string name="all">All</string>
+    <string name="book_group_novel">Novels</string>
+    <string name="book_group_manga">Manga</string>
     <string name="recent_reading">Recent reading</string>
     <string name="last_read">Last reading</string>
     <string name="update_log">What\'s new</string>

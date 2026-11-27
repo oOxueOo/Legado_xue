@@ -7,7 +7,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import io.legado.app.constant.BookType
 import io.legado.app.data.entities.BookGroup
 import kotlinx.coroutines.flow.Flow
 
@@ -26,36 +25,19 @@ interface BookGroupDao {
     @Query("SELECT * FROM book_groups ORDER BY `order`")
     fun flowAll(): Flow<List<BookGroup>>
 
+    /**
+     * 书架分组标签栏使用的分组列表。
+     *
+     * 6 个基础分组常驻（只受 [BookGroup.show] 开关控制），本组暂时没有书也会出现，
+     * 避免「分组时隐时现」；用户自建分组仍按「有书才显示」判断 group 位掩码。
+     */
     @get:Query(
         """
-        with const as (SELECT sum(groupId) sumGroupId FROM book_groups where groupId > 0)
-        SELECT book_groups.* FROM book_groups join const 
-        where show > 0 
+        SELECT book_groups.* FROM book_groups
+        where show > 0
         and (
-            (groupId >= 0  and exists (select 1 from books where `group` & book_groups.groupId > 0))
-            or groupId = -1
-            or (groupId = -2 and exists (select 1 from books where type & ${BookType.local} > 0))
-            or (groupId = -3 and exists (select 1 from books where type & ${BookType.audio} > 0))
-            or (groupId = -6 and exists (select 1 from books where type & ${BookType.video} > 0))
-            or (groupId = -11 and exists (select 1 from books where type & ${BookType.updateError} > 0))
-            or (groupId = -4 
-                and exists (
-                    select 1 from books 
-                    where type & ${BookType.audio} = 0
-                    and type & ${BookType.video} = 0
-                    and type & ${BookType.local} = 0
-                    and const.sumGroupId & `group` = 0
-                )
-            )
-            or (groupId = -5
-                and exists (
-                    select 1 from books 
-                    where type & ${BookType.audio} = 0
-                    and type & ${BookType.video} = 0
-                    and type & ${BookType.local} > 0
-                    and const.sumGroupId & `group` = 0
-                )
-            )
+            groupId in (${BookGroup.IdAll}, ${BookGroup.IdText}, ${BookGroup.IdLocal}, ${BookGroup.IdAudio}, ${BookGroup.IdVideo}, ${BookGroup.IdImage})
+            or (groupId >= 0 and exists (select 1 from books where `group` & book_groups.groupId > 0))
         )
         ORDER BY `order`"""
     )

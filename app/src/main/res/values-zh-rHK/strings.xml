@@ -43,6 +43,8 @@
     <string name="out_favorites">未收藏</string>
     <string name="rss">訂閲</string>
     <string name="all">全部</string>
+    <string name="book_group_novel">小說</string>
+    <string name="book_group_manga">漫畫</string>
     <string name="recent_reading">最近閲讀</string>
     <string name="last_read">最後閲讀</string>
     <string name="update_log">更新日誌</string>

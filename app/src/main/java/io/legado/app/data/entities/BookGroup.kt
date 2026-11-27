@@ -5,7 +5,6 @@ import android.os.Parcelable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import kotlinx.parcelize.Parcelize
 
@@ -34,24 +33,25 @@ data class BookGroup(
         const val IdAll = -1L
         const val IdLocal = -2L
         const val IdAudio = -3L
-        const val IdNetNone = -4L
-        const val IdLocalNone = -5L
         const val IdVideo = -6L
-        const val IdError = -11L
+
+        /** 小说：筛 text 类型位 */
+        const val IdText = -7L
+
+        /** 漫画：筛 image 类型位 */
+        const val IdImage = -8L
+
+        /** 6 个基础筛选分组：只有「显示」开关，不可改名、改封面、删除，但可自由排序 */
+        val baseGroupIds: LongArray = longArrayOf(IdAll, IdText, IdLocal, IdAudio, IdVideo, IdImage)
+
+        fun isBaseGroup(groupId: Long): Boolean = groupId in baseGroupIds
     }
 
-    fun getManageName(context: Context): String {
-        return when (groupId) {
-            IdAll -> "$groupName(${context.getString(R.string.all)})"
-            IdAudio -> "$groupName(${context.getString(R.string.audio)})"
-            IdLocal -> "$groupName(${context.getString(R.string.local)})"
-            IdNetNone -> "$groupName(${context.getString(R.string.net_no_group)})"
-            IdLocalNone -> "$groupName(${context.getString(R.string.local_no_group)})"
-            IdVideo -> "$groupName(${context.getString(R.string.video)})"
-            IdError -> "$groupName(${context.getString(R.string.update_book_fail)})"
-            else -> groupName
-        }
-    }
+    /**
+     * 分组管理与标签栏的展示名：基础分组直接用自己的名字（全部 / 小说 / 本地 / 音频 / 视频 / 漫画），
+     * 不再拼成「全部(全部)」这种重复括号。
+     */
+    fun getManageName(@Suppress("UNUSED_PARAMETER") context: Context): String = groupName
 
     fun getRealBookSort(): Int {
         if (bookSort < 0) {

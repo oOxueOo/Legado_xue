@@ -54,9 +54,6 @@ class BookshelfTagManageViewModel(
                 val groups = appDb.bookGroupDao.all
                     .filter { it.groupId != BookGroup.IdRoot }
                     .sortedBy { it.order }
-                val userGroupMask = groups.asSequence()
-                    .filter { it.groupId > 0 }
-                    .fold(0L) { acc, group -> acc or group.groupId }
                 // 分组删除后可能在配置里留下孤儿标签项：这里统一丢弃并写回，
                 // 否则它们只在书籍详情页的可选标签里出现，管理页却无法删除
                 val validGroupIds = groups.mapTo(HashSet()) { it.groupId }
@@ -68,7 +65,7 @@ class BookshelfTagManageViewModel(
                 val hiddenMap = BookTagManagement.pruneUnknownGroups(storedHiddenMap, validGroupIds)
                 var hiddenChanged = hiddenMap.size != storedHiddenMap.size
                 val result = groups.mapNotNull { group ->
-                    val groupBooks = booksInGroup(group, books, userGroupMask)
+                    val groupBooks = booksInGroup(group, books)
                     val existingTags = groupBooks
                         .flatMap { BookTagHelper.parse(it.customTag) }
                     val configuredTags = configuredMap[group.groupId].orEmpty()
@@ -359,25 +356,16 @@ class BookshelfTagManageViewModel(
     private fun booksInGroup(
         group: BookGroup,
         books: List<BookTagInfo>,
-        userGroupMask: Long,
     ): List<BookTagInfo> = when (group.groupId) {
         BookGroup.IdAll -> books
+        BookGroup.IdText -> books.filter {
+            it.type and BookType.text > 0 &&
+                it.type and (BookType.audio or BookType.video or BookType.image) == 0
+        }
         BookGroup.IdLocal -> books.filter { it.type and BookType.local > 0 }
         BookGroup.IdAudio -> books.filter { it.type and BookType.audio > 0 }
         BookGroup.IdVideo -> books.filter { it.type and BookType.video > 0 }
-        BookGroup.IdError -> books.filter { it.type and BookType.updateError > 0 }
-        BookGroup.IdNetNone -> books.filter {
-            it.type and BookType.audio == 0 &&
-                it.type and BookType.video == 0 &&
-                it.type and BookType.local == 0 &&
-                (it.group and userGroupMask) == 0L
-        }
-        BookGroup.IdLocalNone -> books.filter {
-            it.type and BookType.audio == 0 &&
-                it.type and BookType.video == 0 &&
-                it.type and BookType.local > 0 &&
-                (it.group and userGroupMask) == 0L
-        }
+        BookGroup.IdImage -> books.filter { it.type and BookType.image > 0 }
         else -> if (group.groupId > 0) {
             books.filter { it.group and group.groupId > 0 }
         } else {

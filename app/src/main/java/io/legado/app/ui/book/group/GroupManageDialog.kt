@@ -123,6 +123,8 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
                 root.setBackgroundColor(context.backgroundColor)
                 tvGroup.text = item.getManageName(context)
                 swShow.isChecked = item.show
+                // 6 个基础分组只有「显示」开关：不改名、不改封面、不能删除，但和自建分组一样可自由拖动排序
+                tvEdit.visible(!BookGroup.isBaseGroup(item.groupId))
             }
         }
 

@@ -72,6 +72,9 @@ import io.legado.app.data.entities.UploadHistory
 import io.legado.app.data.entities.UrlRecord
 import io.legado.app.help.DefaultData
 import io.legado.app.model.AutoTaskRule
+import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.putPrefBoolean
 import splitties.init.appCtx
 import java.util.Locale
 
@@ -193,6 +196,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
 
+        const val PREF_BOOK_GROUP_RESET_DONE = "bookGroupResetDone_v2"
+
         const val DATABASE_NAME = "legado.db"
 
         const val BOOK_TABLE_NAME = "books"
@@ -228,29 +233,25 @@ abstract class AppDatabase : RoomDatabase() {
                         select ${BookGroup.IdAll}, '全部', -10, 1
                         where not exists (select * from book_groups where groupId = ${BookGroup.IdAll})"""
                         .trimIndent(),
+                    """insert into book_groups(groupId, groupName, 'order', show)
+                        select ${BookGroup.IdText}, '小说', -9, 1
+                        where not exists (select * from book_groups where groupId = ${BookGroup.IdText})"""
+                        .trimIndent(),
                     """insert into book_groups(groupId, groupName, 'order', enableRefresh, show)
-                        select ${BookGroup.IdLocal}, '本地', -9, 0, 1
+                        select ${BookGroup.IdLocal}, '本地', -8, 0, 1
                         where not exists (select * from book_groups where groupId = ${BookGroup.IdLocal})"""
                         .trimIndent(),
                     """insert into book_groups(groupId, groupName, 'order', show)
-                        select ${BookGroup.IdAudio}, '音频', -8, 1
+                        select ${BookGroup.IdAudio}, '音频', -7, 1
                         where not exists (select * from book_groups where groupId = ${BookGroup.IdAudio})"""
                         .trimIndent(),
                     """insert into book_groups(groupId, groupName, 'order', show)
-                        select ${BookGroup.IdNetNone}, '网络未分组', -7, 1
-                        where not exists (select * from book_groups where groupId = ${BookGroup.IdNetNone})"""
-                        .trimIndent(),
-                    """insert into book_groups(groupId, groupName, 'order', show)
-                        select ${BookGroup.IdLocalNone}, '本地未分组', -6, 0
-                        where not exists (select * from book_groups where groupId = ${BookGroup.IdLocalNone})"""
-                        .trimIndent(),
-                    """insert into book_groups(groupId, groupName, 'order', show)
-                        select ${BookGroup.IdVideo}, '视频', -5, 1
+                        select ${BookGroup.IdVideo}, '视频', -6, 1
                         where not exists (select * from book_groups where groupId = ${BookGroup.IdVideo})"""
                         .trimIndent(),
                     """insert into book_groups(groupId, groupName, 'order', show)
-                        select ${BookGroup.IdError}, '更新失败', -1, 1
-                        where not exists (select * from book_groups where groupId = ${BookGroup.IdError})"""
+                        select ${BookGroup.IdImage}, '漫画', -5, 1
+                        where not exists (select * from book_groups where groupId = ${BookGroup.IdImage})"""
                         .trimIndent(),
                 )
                 for (sql in bookGroupSqls) {
@@ -258,6 +259,34 @@ abstract class AppDatabase : RoomDatabase() {
                         db.execSQL(sql)
                     } catch (e: Exception) {
                         Log.e("AppDatabaseCallback", "onOpen: 插入默认分组失败", e)
+                    }
+                }
+
+                // 删除已废弃的内置分组：网络未分组(-4) / 本地未分组(-5) / 更新失败(-11)
+                try {
+                    db.execSQL("delete from book_groups where groupId in (-4, -5, -11)")
+                } catch (e: Exception) {
+                    Log.e("AppDatabaseCallback", "onOpen: 删除废弃内置分组失败", e)
+                }
+
+                // 一次性清理：删除全部用户自建分组 + 清空书籍分组位 + 清空分组标签配置。
+                // 用 prefer 标记保证只跑一次，避免把用户之后新建的分组也删掉。
+                if (!appCtx.getPrefBoolean(PREF_BOOK_GROUP_RESET_DONE)) {
+                    try {
+                        db.execSQL("update books set `group` = 0")
+                        db.execSQL("delete from book_groups where groupId > 0")
+                        // 基础分组顺序只在这里归一一次：此后用户拖动排序的 order 不再被覆盖
+                        db.execSQL(
+                            "update book_groups set `order` = case groupId " +
+                                "when -1 then -10 when -7 then -9 when -2 then -8 " +
+                                "when -3 then -7 when -6 then -6 when -8 then -5 else `order` end"
+                        )
+                        AppConfig.bookshelfGroupTags = emptyMap()
+                        AppConfig.bookshelfHiddenTags = emptyMap()
+                        appCtx.putPrefBoolean(PREF_BOOK_GROUP_RESET_DONE, true)
+                        Log.d("AppDatabaseCallback", "onOpen: 已清理用户自建分组")
+                    } catch (e: Exception) {
+                        Log.e("AppDatabaseCallback", "onOpen: 清理用户自建分组失败", e)
                     }
                 }
 
