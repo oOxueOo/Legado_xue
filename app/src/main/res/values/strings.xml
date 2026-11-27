@@ -724,6 +724,11 @@
     <string name="smart_tag_rule_cannot_update_desc">Auto update disabled</string>
 
     <string name="show_bookshelf_tag_bar">Show tag bar</string>
+    <string name="book_cover_style">Cover style</string>
+    <string name="cover_style_none">None</string>
+    <string name="cover_style_light">Light</string>
+    <string name="cover_style_crease">Crease</string>
+    <string name="cover_style_spine">Spine</string>
     <string name="group_edit">Group editing</string>
     <string name="move_to_group">Move to group</string>
     <string name="add_group">Add to Groups</string>

@@ -140,8 +140,7 @@ class CoverConfigFragment : PreferenceFragment(),
             PreferKey.coverShowAuthor,
             PreferKey.coverShowAuthorN,
             PreferKey.coverCollectionModeDay,
-            PreferKey.coverCollectionModeNight,
-            PreferKey.bookCoverShadow -> {
+            PreferKey.coverCollectionModeNight -> {
                 refreshCover()
             }
         }

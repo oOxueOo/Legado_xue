@@ -260,7 +260,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:layout_marginTop="12dp"
-            app:layout_constraintTop_toBottomOf="@id/sw_show_bookshelf_tag_bar">
+            app:layout_constraintTop_toBottomOf="@+id/sw_show_bookshelf_tag_bar">
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:layout_width="match_parent"
@@ -327,6 +327,71 @@
 
         </LinearLayout>
 
+        <!-- 立体封面（书架封面绘制样式：无 / 光影 / 折痕 / 书脊） -->
+        <LinearLayout
+            android:id="@+id/book_cover_style_choice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical"
+            app:layout_constraintTop_toBottomOf="@+id/ll_sort">
+
+            <io.legado.app.ui.widget.text.AccentTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="8dp"
+                android:text="@string/book_cover_style"
+                android:textSize="14sp" />
+
+            <RadioGroup
+                android:id="@+id/rg_cover_style"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:minEms="2"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="@string/cover_style_none"
+                    android:textSize="14sp"
+                    tools:ignore="TouchTargetSizeCheck" />
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:minEms="2"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="@string/cover_style_light"
+                    android:textSize="14sp"
+                    tools:ignore="TouchTargetSizeCheck" />
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:minEms="2"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="@string/cover_style_crease"
+                    android:textSize="14sp"
+                    tools:ignore="TouchTargetSizeCheck" />
+
+                <RadioButton
+                    android:layout_width="wrap_content"
+                    android:minEms="2"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="@string/cover_style_spine"
+                    android:textSize="14sp"
+                    tools:ignore="TouchTargetSizeCheck" />
+
+            </RadioGroup>
+        </LinearLayout>
+
         <!-- 书名显示选项 -->
         <LinearLayout
             android:id="@+id/book_name_choice"
@@ -334,7 +399,7 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:layout_marginTop="12dp"
-            app:layout_constraintTop_toBottomOf="@+id/ll_sort">
+            app:layout_constraintTop_toBottomOf="@+id/book_cover_style_choice">
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:layout_width="match_parent"

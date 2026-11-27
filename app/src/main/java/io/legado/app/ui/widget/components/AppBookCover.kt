@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget.components
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
@@ -9,13 +10,9 @@ import android.text.TextPaint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -24,25 +21,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -60,12 +53,18 @@ import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.utils.textHeight
 import io.legado.app.utils.toStringArray
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 
 /**
  * 封面请求失败后的重试次数。
@@ -88,147 +87,293 @@ private const val COVER_LOAD_RETRY_DELAY_MS = 1500L
  */
 private const val COVER_LOAD_TIMEOUT_MS = 12_000L
 
-/**
- * 书脊渐层（拟物版）：12dp 宽，模拟圆柱受光——左缘深、中段亮、右缘再收，并整体压暗。
- *
- * 原版 3dp + 0.26 透明度在实机上几乎看不出来，A/B 两档“加宽加浓”也不够像实物；
- * 这里按圆柱的受光曲线排 3 个停点，再叠竹节压脊线与右缘折页高光（见 [ShelfBookSpine]）。
- *
- * 做成顶层常量而不是在组合里现建：与封面尺寸无关，网格一次滚动要重组几十个条目。
- */
-private val COVER_SPINE_BRUSH = Brush.horizontalGradient(
-    0.0f to Color.Black.copy(alpha = 0.32f),
-    0.50f to Color.Black.copy(alpha = 0.45f),
-    1.0f to Color.Black.copy(alpha = 0.18f)
-)
+// ── 立体封面（书架专用绘制）──────────────────────────────────────────────
+// 参数与效果图一一对应：折面宽 4dp、色带宽 4dp、折痕区 4dp、圆角 2dp、竹节 3 道 0.7dp，
+// 全部以 66dp 封面宽为基准按比例换算（见 AppDimens.SHELF_COVER_*_RATIO）。
 
-/** 竹节压脊线的位置（沿书脊高度均布），线本身 1.2dp：上暗下亮，做出凸起 */
-private val SPINE_RIDGES = floatArrayOf(0.10f, 0.34f, 0.58f, 0.82f)
+/** 竹节位置：3 道，按封面高度百分比 */
+private val COVER_RIDGE_POSITIONS = floatArrayOf(0.16f, 0.47f, 0.78f)
 
-/** 书脊右缘的折页高光：宽度 1dp，靠它给书脊一个明确的边界 */
-private val COVER_SPINE_HIGHLIGHT = Color.White.copy(alpha = 0.14f)
+/** 右下压边颜色：比纯黑偏暖一点，像墨/纸的边而不是电子黑 */
+private val COVER_PRESS_EDGE = Color(0xFF181410)
 
-/** 纸页块配色：纸芯浅、页层暗、外缘更深（与主题无关，纸就是纸的颜色） */
-private val PAGE_BLOCK_LIGHT = Color(0xFFF3EBDB)
-private val PAGE_BLOCK_DARK = Color(0xFFC8BBA3)
-private val PAGE_BLOCK_LINE = Color(0xFF786954)
-private val PAGE_BLOCK_EDGE = Color(0xFF463A2C)
-private val PAGE_BLOCK_LINE_ALPHA = 0.27f
-private val PAGE_BLOCK_EDGE_ALPHA = 0.43f
+/** 内描边颜色（压住封面缩放后的毛边） */
+private val COVER_INNER_STROKE = Color(0xFF968C82)
 
 /**
- * 书架封面的落影（拟物双层）。
+ * 定向光影的软影层。
  *
- * Android 原生的 elevation 阴影是"软高斯"，铺在山水壁纸这种有纹理的背景上基本糊掉
- * （用户反馈"阴影厚度不明显、不够立体"）。这里自绘两层：
- * 外扩 7dp / 下移 4dp 的落影（5 层逐级加宽，模拟书底离开桌面的距离），
- * 再加一层 1.5dp 的贴地接触影（书压住桌面的那圈最暗边）。
- * 自绘放在 clip 之前，所以不会被封面圆角裁掉。
+ * 把同一个圆角矩形按 [blur] 由外向内叠 [steps] 层填充：最外层 alpha 趋 0、逐层向内累积到
+ * [alpha]，形成连续衰减。不用 `BlurMaskFilter`（GPU 画布上会被忽略，直接变成一圈硬边），
+ * 也不用 `Modifier.shadow`（那是四周均匀的 elevation，出不来"只往右下压"的实物感）。
  */
-private fun Modifier.shelfCoverShadow(radius: Dp): Modifier = drawBehind {
-    val corner = radius.toPx()
-    // 落影：离地感
-    val maxSpread = 7.dp.toPx()
-    val shiftY = 4.dp.toPx()
-    val layers = 5
-    for (i in layers downTo 1) {
-        val spread = maxSpread * i / layers
+private fun DrawScope.softCoverShadow(
+    rectSize: Size,
+    corner: Float,
+    offset: Offset,
+    blur: Float,
+    alpha: Float,
+    steps: Int = 7,
+) {
+    if (blur <= 0f || alpha <= 0f) return
+    var prev = 0f
+    for (i in 1..steps) {
+        // i = 1 是最外层（最大外扩），i = steps 是贴着封面轮廓的一层
+        val grow = blur * (steps - i + 1).toFloat() / steps
+        val t = (grow / blur).coerceIn(0f, 1f)
+        val target = alpha * (1f - t) * (1f - t)
+        val layerAlpha = (1f - (1f - target) / (1f - prev)).coerceIn(0f, 1f)
+        prev = target
+        if (layerAlpha <= 0f) continue
         drawRoundRect(
-            color = Color.Black.copy(alpha = 0.075f),
-            topLeft = Offset(-spread, -spread + shiftY),
-            size = Size(size.width + spread * 2, size.height + spread * 2),
-            cornerRadius = CornerRadius(corner + spread),
+            color = Color.Black.copy(alpha = layerAlpha),
+            topLeft = Offset(offset.x - grow, offset.y - grow),
+            size = Size(rectSize.width + grow * 2, rectSize.height + grow * 2),
+            cornerRadius = CornerRadius(corner + grow),
         )
     }
-    // 接触影：压在桌面上的那一圈
-    val contact = 1.5.dp.toPx()
-    drawRoundRect(
-        color = Color.Black.copy(alpha = 0.30f),
-        topLeft = Offset(-contact, -contact + 2.dp.toPx()),
-        size = Size(size.width + contact * 2, size.height + contact * 2),
-        cornerRadius = CornerRadius(corner + contact),
-    )
 }
 
-/**
- * 封面主体形状：右缘、底缘各被纸页块切掉一条楔形（顶/左 3dp 起，角上收到 8dp），
- * 于是封面是一块"正面板"，右下露出一圈纸边。
- */
-private fun pageShapeOf(basePx: Float, thickPx: Float): Shape = GenericShape { size, _ ->
-    moveTo(0f, 0f)
-    lineTo(size.width - basePx, 0f)
-    lineTo(size.width - thickPx, size.height - thickPx)
-    lineTo(0f, size.height - basePx)
-    close()
-}
-
-/** 纸页块：楔形纸面 + 3 道页层细线 + 外缘压暗线 */
-private fun DrawScope.drawPageBlock(basePx: Float, thickPx: Float) {
+/** 立体封面的投影：远场 + 近场软影（向右下偏移）+ 只压右侧和下侧的接触影 */
+private fun DrawScope.drawShelfCoverShadow(cornerPx: Float) {
     val w = size.width
     val h = size.height
-    val path = Path().apply {
-        moveTo(w - basePx, 0f)
-        lineTo(w, 0f)
-        lineTo(w, h)
-        lineTo(0f, h)
-        lineTo(0f, h - basePx)
-        lineTo(w - thickPx, h - thickPx)
-        close()
-    }
-    drawPath(path, Brush.verticalGradient(listOf(PAGE_BLOCK_LIGHT, PAGE_BLOCK_DARK)))
-    val hair = 1f
-    for (k in floatArrayOf(0.35f, 0.60f, 0.82f)) {
-        val off = basePx + (thickPx - basePx) * k
-        drawLine(
-            color = PAGE_BLOCK_LINE.copy(alpha = PAGE_BLOCK_LINE_ALPHA),
-            start = Offset(w - off, 0f),
-            end = Offset(w - off, h),
-            strokeWidth = hair,
-        )
-        drawLine(
-            color = PAGE_BLOCK_LINE.copy(alpha = PAGE_BLOCK_LINE_ALPHA),
-            start = Offset(0f, h - off),
-            end = Offset(w, h - off),
-            strokeWidth = hair,
-        )
-    }
-    drawLine(
-        color = PAGE_BLOCK_EDGE.copy(alpha = PAGE_BLOCK_EDGE_ALPHA),
-        start = Offset(w - hair, 0f),
-        end = Offset(w - hair, h),
-        strokeWidth = hair,
+    // 1 个"设计 dp"对应的像素数：封面宽 / 66
+    val u = w / AppDimens.SHELF_COVER_STYLE_BASE_WIDTH
+    val body = Size(w, h)
+
+    // 远场：偏移 3 / 4.5dp，模糊 8dp，alpha 0.20
+    softCoverShadow(body, cornerPx, Offset(3f * u, 4.5f * u), 8f * u, 0.20f)
+    // 近场：偏移 1.5 / 2.5dp，模糊 4dp，alpha 0.36
+    softCoverShadow(body, cornerPx, Offset(1.5f * u, 2.5f * u), 4f * u, 0.36f)
+
+    // 接触影：贴着封面右沿/下沿往外 1.6dp 衰减到 0，是"书压在桌面上"的那道深线
+    val contact = 1.6f * u
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent),
+            startX = w,
+            endX = w + contact,
+        ),
+        topLeft = Offset(w, cornerPx),
+        size = Size(contact, (h - cornerPx * 2).coerceAtLeast(0f)),
     )
-    drawLine(
-        color = PAGE_BLOCK_EDGE.copy(alpha = PAGE_BLOCK_EDGE_ALPHA),
-        start = Offset(0f, h - hair),
-        end = Offset(w, h - hair),
-        strokeWidth = hair,
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent),
+            startY = h,
+            endY = h + contact,
+        ),
+        topLeft = Offset(cornerPx, h),
+        size = Size((w - cornerPx * 2).coerceAtLeast(0f), contact),
     )
 }
 
-/** 拟物书脊：圆柱受光渐层 + 4 道竹节压脊（上暗下亮）+ 右缘折页高光 */
-private fun DrawScope.drawBookSpine() {
-    drawRect(brush = COVER_SPINE_BRUSH)
-    val ridge = 1.2.dp.toPx()
-    for (f in SPINE_RIDGES) {
-        val y = size.height * f
-        drawRect(
-            color = Color.Black.copy(alpha = 0.27f),
-            topLeft = Offset(0f, y),
-            size = Size(size.width, ridge),
-        )
-        drawRect(
-            color = Color.White.copy(alpha = 0.16f),
-            topLeft = Offset(0f, y + ridge),
-            size = Size(size.width, ridge),
-        )
-    }
-    val line = 1.dp.toPx()
+/** 按亮度系数 [k] 与基础色混出膏体色：色带要用主色的明暗分层，而不是纯色块 */
+private fun Color.shade(k: Float, alpha: Float): Color = Color(
+    red = (red * k).coerceIn(0f, 1f),
+    green = (green * k).coerceIn(0f, 1f),
+    blue = (blue * k).coerceIn(0f, 1f),
+    alpha = alpha,
+)
+
+/** 只加一道折痕：靠明暗把封面"折"出一道脊，不占任何颜色 */
+private fun DrawScope.drawCoverCrease(u: Float) {
+    val h = size.height
+    val bw = AppDimens.SHELF_COVER_CREASE_RATIO * size.width
+    // 折痕外侧（书脊面）微亮，往折线收
+    val lit = bw * 0.42f
     drawRect(
-        color = COVER_SPINE_HIGHLIGHT,
-        topLeft = Offset(size.width - line, 0f),
-        size = Size(line, size.height),
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.White.copy(alpha = 0.09f), Color.White.copy(alpha = 0.02f)),
+            startX = 0f,
+            endX = lit,
+        ),
+        topLeft = Offset.Zero,
+        size = Size(lit, h),
     )
+    // 折线一侧压暗
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.24f)),
+            startX = lit,
+            endX = bw,
+        ),
+        topLeft = Offset(lit, 0f),
+        size = Size(bw - lit, h),
+    )
+    val lw = max(1f, 0.5f * u)
+    // 折线（暗）+ 封面侧高光，一道折痕的"硬边界"就是这两根线
+    drawRect(Color.Black.copy(alpha = 0.60f), Offset(bw - lw, 0f), Size(lw, h))
+    drawRect(Color.White.copy(alpha = 0.29f), Offset(bw, 0f), Size(lw, h))
+    // 高光向封面内侧渐隐 2dp
+    val fade = 2f * u
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.White.copy(alpha = 0.06f), Color.Transparent),
+            startX = bw + lw,
+            endX = bw + lw + fade,
+        ),
+        topLeft = Offset(bw + lw, 0f),
+        size = Size(fade, h),
+    )
+}
+
+/** 半透明竹节书脊：主色 72% 叠在封面上，圆柱受光 + 3 道竹节 */
+private fun DrawScope.drawCoverSpineBand(base: Color, u: Float) {
+    val h = size.height
+    val bw = AppDimens.SHELF_COVER_BAND_RATIO * size.width
+    val bandAlpha = 0.72f
+    // 横向圆柱受光：0.86 + 0.22·sin(0.8πt) - 0.34·max(0, t-0.5)，取 5 个色标近似
+    val ks = floatArrayOf(0.86f, 0.99f, 1.07f, 0.98f, 0.82f)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(
+                base.shade(ks[0], bandAlpha),
+                base.shade(ks[1], bandAlpha),
+                base.shade(ks[2], bandAlpha),
+                base.shade(ks[3], bandAlpha),
+                base.shade(ks[4], bandAlpha),
+            ),
+            startX = 0f,
+            endX = bw,
+        ),
+        topLeft = Offset.Zero,
+        size = Size(bw, h),
+    )
+    val lw = max(1f, 0.5f * u)
+    // 带内折线
+    drawRect(Color.Black.copy(alpha = 0.20f), Offset(0.9f * u, 0f), Size(lw, h))
+    // 右边界压暗 + 封面侧高光
+    drawRect(Color.Black.copy(alpha = 0.43f), Offset(bw - lw, 0f), Size(lw, h))
+    drawRect(Color.White.copy(alpha = 0.15f), Offset(bw, 0f), Size(lw, h))
+    // 3 道竹节：每道一暗一亮
+    val ridge = max(1f, 0.7f * u)
+    COVER_RIDGE_POSITIONS.forEach { pos ->
+        val y = h * pos
+        drawRect(Color.Black.copy(alpha = 0.38f), Offset(0f, y), Size(bw, ridge))
+        drawRect(Color.White.copy(alpha = 0.13f), Offset(0f, y + ridge), Size(bw, max(1f, 0.5f * u)))
+    }
+}
+
+/** 立体封面的装饰层：折面 → 折痕/书脊 → 右下压边 → 内描边 */
+private fun DrawScope.drawShelfCoverDecor(style: Int, cornerPx: Float, spineBase: Color) {
+    val w = size.width
+    val h = size.height
+    val u = w / AppDimens.SHELF_COVER_STYLE_BASE_WIDTH
+    val bevel = AppDimens.SHELF_COVER_BEVEL_RATIO * w
+
+    // ① 左侧受光亮面
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.White.copy(alpha = 0.16f), Color.Transparent),
+            startX = 0f,
+            endX = bevel,
+        ),
+        topLeft = Offset.Zero,
+        size = Size(bevel, h),
+    )
+    // ② 右侧背光暗面 + 向内 1.4dp 的余晕（避免 4dp 暗面收得太突然）
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.28f)),
+            startX = w - bevel,
+            endX = w,
+        ),
+        topLeft = Offset(w - bevel, 0f),
+        size = Size(bevel, h),
+    )
+    val tail = 1.4f * u
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.078f)),
+            startX = w - bevel - tail,
+            endX = w - bevel,
+        ),
+        topLeft = Offset(w - bevel - tail, 0f),
+        size = Size(tail, h),
+    )
+
+    // ③ 档位装饰
+    when (style) {
+        AppDimens.SHELF_COVER_STYLE_CREASE -> drawCoverCrease(u)
+        AppDimens.SHELF_COVER_STYLE_SPINE -> drawCoverSpineBand(spineBase, u)
+    }
+
+    // ④ 右下压边：给"书沿"一条硬边界，同时压住右侧暗面最重的一段
+    val edge = max(1f, 0.7f * u)
+    drawRect(
+        color = COVER_PRESS_EDGE.copy(alpha = 0.59f),
+        topLeft = Offset(w - edge, 0f),
+        size = Size(edge, h),
+    )
+    drawRect(
+        color = COVER_PRESS_EDGE.copy(alpha = 0.59f),
+        topLeft = Offset(0f, h - edge),
+        size = Size(w, edge),
+    )
+
+    // ⑤ 内描边：压住封面缩放后的毛边，整圈轮廓才干净。描边居中在轮廓线上，
+    // 内缩半个线宽才不会被外层圆角裁剪掉一半
+    val strokeWidth = max(1f, 0.5f * u)
+    val half = strokeWidth / 2f
+    drawRoundRect(
+        color = COVER_INNER_STROKE.copy(alpha = 0.35f),
+        topLeft = Offset(half, half),
+        size = Size(w - strokeWidth, h - strokeWidth),
+        cornerRadius = CornerRadius((cornerPx - half).coerceAtLeast(0f)),
+        style = Stroke(width = strokeWidth),
+    )
+}
+
+/**
+ * 取封面主色：缩成 16×16 后按 S·V 加权求色相均值，饱和度 ×1.15、明度 ×0.46。
+ *
+ * 与效果图脚本 `dominant_color()` 同一套算法：先按权重求色相单位向量，再回推色相；
+ * 明度压低 0.46 是为了让色带比封面更暗一档，看起来像"书脊比封面受光更少"。
+ * 非位图封面（动图等）返回 null，调用方退回主题主色。
+ */
+internal fun dominantCoverColor(drawable: Drawable?): Color? {
+    val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: return null
+    return runCatching {
+        val side = 16
+        val scaled = Bitmap.createScaledBitmap(bitmap, side, side, true)
+        val pixels = IntArray(side * side)
+        scaled.getPixels(pixels, 0, side, 0, 0, side, side)
+        if (scaled !== bitmap) scaled.recycle()
+
+        val hsv = FloatArray(3)
+        var weight = 0f
+        var hx = 0f
+        var hy = 0f
+        var satSum = 0f
+        var valSum = 0f
+        pixels.forEach { px ->
+            val r = (px shr 16 and 0xFF) / 255f
+            val g = (px shr 8 and 0xFF) / 255f
+            val b = (px and 0xFF) / 255f
+            android.graphics.Color.RGBToHSV(
+                (r * 255).toInt(), (g * 255).toInt(), (b * 255).toInt(), hsv
+            )
+            val h = hsv[0] / 360f
+            val s = hsv[1]
+            val v = hsv[2]
+            if (s > 0.18f && v > 0.12f) {
+                val wt = s * v
+                weight += wt
+                hx += cos(2f * PI.toFloat() * h) * wt
+                hy += sin(2f * PI.toFloat() * h) * wt
+                satSum += s * wt
+                valSum += v * wt
+            }
+        }
+        if (weight <= 0f) return@runCatching null
+        var hue = atan2(hy, hx) / (2f * PI.toFloat())
+        if (hue < 0f) hue += 1f
+        val sat = (satSum / weight * 1.15f).coerceIn(0f, 1f)
+        val value = (valSum / weight * 0.46f).coerceIn(0f, 1f)
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue * 360f, sat, value)))
+    }.getOrNull()
 }
 
 /**
@@ -249,8 +394,8 @@ private fun DrawScope.drawBookSpine() {
  * @param contentDescription 无障碍描述，一般传书名
  * @param sourceOrigin 书源来源标识，影响网络请求头与图集身份回退
  * @param cornerRadius 封面圆角
- * @param shelfStyle 书架条目样式（拟物书）：右下 3→8dp 纸页块 + 12dp 书脊（竹节压脊 + 折页高光）
- *   + 1dp 内描边 + 双层落影。只给书架（网格 / 列表）开启，搜索结果、书籍详情等封面保持干净的纯图。
+ * @param coverStyle 书架「立体封面」档位（无 / 光影 / 折痕 / 书脊）。只给书架（网格 / 列表）
+ *   开启，搜索结果、书籍详情等封面传默认的 0，保持干净的纯图。
  * @param loadOnlyWifi 是否只允许 WiFi 下加载网络封面
  */
 @Composable
@@ -263,7 +408,7 @@ fun AppBookCover(
     contentDescription: String?,
     sourceOrigin: String? = null,
     cornerRadius: Dp = AppDimens.bookCoverCornerRadius,
-    shelfStyle: Boolean = false,
+    coverStyle: Int = AppDimens.SHELF_COVER_STYLE_NONE,
     loadOnlyWifi: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -281,6 +426,19 @@ fun AppBookCover(
     // 最终显示的是默认封面：既没有真实图片，或用户开启了"使用默认封面"。
     // 此时书名叠加属于"封面本身"的一部分，而不是加载失败的兜底
     val defaultCoverShown = !htmlCover && (realPath == null || useDefaultCover)
+
+    val styled = coverStyle != AppDimens.SHELF_COVER_STYLE_NONE
+    val shape = RoundedCornerShape(cornerRadius)
+    // 主题主色的压暗版：封面取不到主色（动图 / 取色失败）时给色带兜底
+    val themePrimary = MaterialTheme.colorScheme.primary
+    val fallbackSpine = remember(themePrimary) {
+        Color(
+            red = themePrimary.red * 0.55f,
+            green = themePrimary.green * 0.55f,
+            blue = themePrimary.blue * 0.55f,
+        )
+    }
+    var spineColor by remember(realPath, coverStyle) { mutableStateOf<Color?>(null) }
 
     var bounds by remember { mutableStateOf(IntSize.Zero) }
     // 拼请求键：滚动时条目会大量重组，用 remember 挡住每次的 list/字符串分配
@@ -326,74 +484,50 @@ fun AppBookCover(
         loadFailed = loaded == null
     }
 
+    // 书脊档要取封面主色：16×16 采样是纯 CPU 活，放到后台线程，避免列表滚动时卡主线程。
+    // 单独放一个 effect、以 drawable 为键：切档位不必重发封面请求，图换了才重算一次。
+    LaunchedEffect(drawable, coverStyle) {
+        if (coverStyle == AppDimens.SHELF_COVER_STYLE_SPINE) {
+            spineColor = withContext(Dispatchers.Default) { dominantCoverColor(drawable) }
+        }
+    }
+
     Box(
         modifier = modifier
+            .onSizeChanged { bounds = it }
             .then(
                 // 投影画在裁剪之前：clip 之后阴影会被一起裁掉，投影必须落在外层。
-                // 浓度一并加重（原 0.16/0.26 在浅色底上薄得看不出厚度）
-                if (shelfStyle && AppConfig.bookCoverShadow) {
+                // 立体封面自己画定向光影，这里只负责"无"档的原 elevation 软影。
+                if (!styled && AppConfig.bookCoverShadow) {
                     Modifier.shadow(
                         elevation = AppDimens.bookCoverShadowElevation,
-                        shape = RoundedCornerShape(cornerRadius),
+                        shape = shape,
                         clip = false,
-                        ambientColor = Color.Black.copy(alpha = 0.26f),
-                        spotColor = Color.Black.copy(alpha = 0.45f),
-                    ).then(Modifier.shelfCoverShadow(cornerRadius))
+                        ambientColor = Color.Black.copy(alpha = 0.16f),
+                        spotColor = Color.Black.copy(alpha = 0.26f),
+                    )
                 } else {
                     Modifier
                 }
             )
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(
-                if (AppConfig.bookCoverShadow) MaterialTheme.colorScheme.background
-                else Color.Transparent
-            )
-            .onSizeChanged { bounds = it }
     ) {
-        val cover = drawable
-        if (shelfStyle) {
-            // 纸页块画在最底层：右/底露出 3dp→8dp 的纸边，封面主体按楔形内缩
-            val basePx = with(LocalDensity.current) { AppDimens.bookCoverPageBase.toPx() }
-            val thickPx = with(LocalDensity.current) {
-                (AppDimens.bookCoverPageBase + AppDimens.bookCoverPageGrow).toPx()
+        if (styled) {
+            // 定向光影要落到封面外侧，只能画在未被裁剪的外层上
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawShelfCoverShadow(cornerRadius.toPx())
             }
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawPageBlock(basePx, thickPx)
-            }
-            val pageShape = remember(basePx, thickPx) { pageShapeOf(basePx, thickPx) }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(pageShape)
-            ) {
-                if (cover != null) {
-                    Image(
-                        painter = remember(cover) { AppDrawablePainter(cover) },
-                        contentDescription = contentDescription,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                // 书脊：12dp 圆柱受光渐层 + 4 道竹节压脊 + 右缘折页高光
-                Canvas(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxHeight()
-                        .width(AppDimens.bookCoverSpineWidth)
-                ) {
-                    drawBookSpine()
-                }
-                // 有真实图片时只在加载失败后叠加书名；默认封面场景则始终叠加
-                if (drawName && !htmlCover && (defaultCoverShown || loadFailed)) {
-                    BookCoverTextOverlay(
-                        name = name.orEmpty(),
-                        author = author.orEmpty(),
-                        drawAuthor = BookCover.drawBookAuthor,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-        } else {
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(
+                    if (AppConfig.bookCoverShadow || styled) MaterialTheme.colorScheme.background
+                    else Color.Transparent
+                )
+        ) {
+            val cover = drawable
+            val withText = drawName && !htmlCover && (defaultCoverShown || loadFailed)
             if (cover != null) {
                 Image(
                     painter = remember(cover) { AppDrawablePainter(cover) },
@@ -403,7 +537,7 @@ fun AppBookCover(
                 )
             }
             // 有真实图片时只在加载失败后叠加书名；默认封面场景则始终叠加
-            if (drawName && !htmlCover && (defaultCoverShown || loadFailed)) {
+            if (withText) {
                 BookCoverTextOverlay(
                     name = name.orEmpty(),
                     author = author.orEmpty(),
@@ -411,18 +545,16 @@ fun AppBookCover(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-        }
-        // 内描边最后画，压住图片与书名叠层的边缘毛边
-        if (shelfStyle) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(
-                        width = AppDimens.bookCoverBorderWidth,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(cornerRadius),
+            // 立体封面装饰压在图上：折面、折痕、色带、压边、内描边
+            if (styled) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawShelfCoverDecor(
+                        style = coverStyle,
+                        cornerPx = cornerRadius.toPx(),
+                        spineBase = spineColor ?: fallbackSpine,
                     )
-            )
+                }
+            }
         }
     }
 }
@@ -635,6 +767,23 @@ private fun AppBookCoverWithPathPreview() {
             coverPath = "file:///android_asset/preview_cover.jpg",
             galleryIdentity = "preview",
             contentDescription = null,
+        )
+    }
+}
+
+@Preview(name = "立体封面·书脊档", showBackground = true)
+@Composable
+private fun AppBookCoverSpinePreview() {
+    LegadoTheme {
+        AppBookCover(
+            modifier = Modifier.size(width = 66.dp, height = 88.dp),
+            name = "剑来",
+            author = "烽火戏诸侯",
+            coverPath = "file:///android_asset/preview_cover.jpg",
+            galleryIdentity = "preview",
+            contentDescription = null,
+            cornerRadius = AppDimens.shelfCoverCornerRadius,
+            coverStyle = AppDimens.SHELF_COVER_STYLE_SPINE,
         )
     }
 }

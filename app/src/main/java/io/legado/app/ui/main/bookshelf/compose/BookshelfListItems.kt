@@ -66,7 +66,7 @@ private fun BookshelfStandardListItem(
         onClick = { onClick(bookItem) },
         onLongClick = { onLongClick(bookItem) },
     ) {
-        BookshelfItemCover(bookItem, AppDimens.shelfCoverWidth)
+        BookshelfItemCover(bookItem, AppDimens.shelfCoverWidth, displayConfig.coverStyle)
         Spacer(modifier = Modifier.width(AppDimens.shelfCoverNameSpacing))
         Column(modifier = Modifier.weight(1f)) {
             BookshelfItemTitleRow(bookItem, displayConfig, AppDimens.shelfListLoadingSize)
@@ -120,7 +120,7 @@ private fun BookshelfCompactListItem(
         onClick = { onClick(bookItem) },
         onLongClick = { onLongClick(bookItem) },
     ) {
-        BookshelfItemCover(bookItem, AppDimens.shelfCoverWidthCompact)
+        BookshelfItemCover(bookItem, AppDimens.shelfCoverWidthCompact, displayConfig.coverStyle, compact = true)
         Spacer(modifier = Modifier.width(AppDimens.shelfCoverNameSpacing))
         Column(modifier = Modifier.weight(1f)) {
             BookshelfItemTitleRow(bookItem, displayConfig, AppDimens.shelfListLoadingSize)
@@ -228,7 +228,12 @@ private fun BookshelfItemContainer(
 }
 
 @Composable
-private fun RowScope.BookshelfItemCover(bookItem: BookshelfBookItem, width: Dp) {
+private fun RowScope.BookshelfItemCover(
+    bookItem: BookshelfBookItem,
+    width: Dp,
+    style: Int,
+    compact: Boolean = false,
+) {
     AppBookCover(
         modifier = Modifier
             .width(width)
@@ -239,7 +244,10 @@ private fun RowScope.BookshelfItemCover(bookItem: BookshelfBookItem, width: Dp) 
         galleryIdentity = bookItem.display.bookUrl,
         sourceOrigin = bookItem.display.origin,
         contentDescription = bookItem.display.name,
-        shelfStyle = true,
+        cornerRadius = AppDimens.shelfCoverCornerRadius,
+        // 紧凑列表只有 48dp 宽：折痕/书脊在这个尺寸上缩到 3dp 以内，糊成一片，
+        // 所以固定按「无」绘制，不管全局选的是哪一档
+        coverStyle = if (compact) AppDimens.SHELF_COVER_STYLE_NONE else style,
     )
 }
 

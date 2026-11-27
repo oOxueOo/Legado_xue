@@ -168,6 +168,8 @@ private fun FolderCover(modifier: Modifier, folder: BookshelfFolderItem) {
         coverPath = folder.cover,
         galleryIdentity = BookshelfFolderItem.coverGalleryIdentity(folder.groupId),
         contentDescription = folder.name,
-        shelfStyle = true,
+        // 文件夹封面保持纯封面，不套立体封面（立体封面只给书）
+        cornerRadius = AppDimens.shelfCoverCornerRadius,
+        coverStyle = AppDimens.SHELF_COVER_STYLE_NONE,
     )
 }

@@ -123,15 +123,40 @@ object AppDimens {
     /** 封面内描边粗细：把封面从背景里"框"出来，避免浅色封面糊在浅色背景上 */
     val bookCoverBorderWidth: Dp = 1.dp
 
-    /** 封面投影高度（向下定向投影，配合"显示封面阴影"开关；3dp 时几乎看不出厚度，提到 7dp） */
-    val bookCoverShadowElevation: Dp = 7.dp
+    /** 封面投影高度（向下 3dp 定向投影，配合"显示封面阴影"开关） */
+    val bookCoverShadowElevation: Dp = 3.dp
 
-    /** 封面左侧书脊渐变的宽度：拟物书脊 12dp，要能放下竹节压脊线 */
-    val bookCoverSpineWidth: Dp = 12.dp
+    // ── 书架封面「立体封面」（四档：无 / 光影 / 折痕 / 书脊）──
+    // 方案按 66dp 宽 × 88dp 高（3:4）的封面出图定稿，所有折面、色带、折痕、竹节的宽度
+    // 都按「封面实际宽度 / 66」等比换算：网格 2 列、3 列、列表封面比例一致，不会出现
+    // 大封面上细得像没画、小封面上糊成一团的偏差。
 
-    /** 纸页块：右/底露出的一薄一厚（封面内侧被裁掉的部分） */
-    val bookCoverPageBase: Dp = 3.dp
-    val bookCoverPageGrow: Dp = 5.dp
+    /** 立体封面：无（保持纯封面，只有 1.3.4 的 3dp 均匀软影） */
+    const val SHELF_COVER_STYLE_NONE = 0
+
+    /** 立体封面：光影（定向光影 + 左右折面） */
+    const val SHELF_COVER_STYLE_LIGHT = 1
+
+    /** 立体封面：折痕（光影 + 左缘折痕） */
+    const val SHELF_COVER_STYLE_CREASE = 2
+
+    /** 立体封面：书脊（光影 + 半透明主色竹节脊） */
+    const val SHELF_COVER_STYLE_SPINE = 3
+
+    /** 立体封面方案定稿时的封面宽度（比例基准） */
+    const val SHELF_COVER_STYLE_BASE_WIDTH = 66f
+
+    /** 左右折面宽 / 封面宽 = 4 / 66 */
+    const val SHELF_COVER_BEVEL_RATIO = 4f / SHELF_COVER_STYLE_BASE_WIDTH
+
+    /** 书脊色带宽 / 封面宽 = 4 / 66 */
+    const val SHELF_COVER_BAND_RATIO = 4f / SHELF_COVER_STYLE_BASE_WIDTH
+
+    /** 折痕区宽 / 封面宽 = 4 / 66 */
+    const val SHELF_COVER_CREASE_RATIO = 4f / SHELF_COVER_STYLE_BASE_WIDTH
+
+    /** 书架封面圆角：四档统一 2dp。不要复用 [bookCoverCornerRadius]，那个值 RSS 等页面也在用 */
+    val shelfCoverCornerRadius: Dp = 2.dp
 
     /** 封面内嵌阅读进度条与封面左右、下沿的内缩 */
     val shelfCoverProgressInset: Dp = 4.dp

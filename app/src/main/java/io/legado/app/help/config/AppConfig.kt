@@ -934,6 +934,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val bookCoverShadow get() = appCtx.getPrefBoolean(PreferKey.bookCoverShadow, true)
 
+    /** 书架封面「立体封面」档位：0 无 / 1 光影 / 2 折痕 / 3 书脊；默认 0（保持 1.3.4 的纯封面观感） */
+    var bookshelfCoverStyle: Int
+        // 夹到合法范围：prefs 被写坏时不要让绘制走进未知档位
+        get() = appCtx.getPrefInt(PreferKey.bookshelfCoverStyle, 0).coerceIn(0, 3)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.bookshelfCoverStyle, value.coerceIn(0, 3))
+        }
+
     val showAddToShelfAlert get() = appCtx.getPrefBoolean(PreferKey.showAddToShelfAlert, true)
 
     /** 阅读达到设定时长后自动加入书架，默认关闭。 */

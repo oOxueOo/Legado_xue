@@ -17,6 +17,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.theme.AppDimens
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.cache.CacheActivity
@@ -222,6 +223,10 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
                         swShowBookshelfTagBar.isChecked = AppConfig.showBookshelfTagBar
+                        if (AppConfig.bookshelfCoverStyle !in rgCoverStyle.indices) {
+                            AppConfig.bookshelfCoverStyle = AppDimens.SHELF_COVER_STYLE_NONE
+                        }
+                        rgCoverStyle.checkByIndex(AppConfig.bookshelfCoverStyle)
                         // 初始化"显示更多信息"相关开关状态
                         llShowMoreInfo.visibility = if (bookLayout == 0) View.VISIBLE else View.GONE
                         swShowMoreInfo.isChecked = AppConfig.showMoreInfoInList
@@ -268,9 +273,14 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         rgbLayout.checkByIndex(showBookname)
                         // 根据书籍视图控制书名显示选项的可见性
                         bookNameChoice.visibility = if (bookLayout > 1) View.VISIBLE else View.GONE
+                        // 紧凑列表只有 48dp 封面，立体封面强制为「无」，这一行也就没有意义
+                        bookCoverStyleChoice.visibility =
+                            if (bookLayout == 1) View.GONE else View.VISIBLE
                         spBookView.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                                 bookNameChoice.visibility = if (position > 1) View.VISIBLE else View.GONE
+                                bookCoverStyleChoice.visibility =
+                                    if (position == 1) View.GONE else View.VISIBLE
                                 // 根据书籍视图控制"显示更多信息"的可见性（仅在标准列表视图时显示）
                                 llShowMoreInfo.visibility = if (position == 0) View.VISIBLE else View.GONE
                                 // 书籍外边框开关（仅在列表/紧凑列表视图时显示）
@@ -327,6 +337,11 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                     if (AppConfig.showBookshelfTagBar != swShowBookshelfTagBar.isChecked) {
                         AppConfig.showBookshelfTagBar = swShowBookshelfTagBar.isChecked
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
+                    }
+                    // 立体封面档位：只影响封面绘制，不改条目尺寸，刷新一次即可
+                    if (AppConfig.bookshelfCoverStyle != rgCoverStyle.getCheckedIndex()) {
+                        AppConfig.bookshelfCoverStyle = rgCoverStyle.getCheckedIndex()
+                        refreshBookshelf = true
                     }
                     // 保存"显示更多信息"相关配置
                     if (AppConfig.showMoreInfoInList != swShowMoreInfo.isChecked) {

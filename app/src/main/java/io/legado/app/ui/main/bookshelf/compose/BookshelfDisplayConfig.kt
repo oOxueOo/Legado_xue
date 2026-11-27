@@ -21,6 +21,7 @@ import io.legado.app.help.config.AppConfig
  * @param showBookName 网格条目书名位置：0 封面下方 / 1 不显示 / 2 叠在封面上
  * @param marginPx 条目外边距（用户可调）
  * @param fastScrollerEnabled 显示快速滚动条
+ * @param coverStyle 封面「立体封面」档位：0 无 / 1 光影 / 2 折痕 / 3 书脊
  */
 @Immutable
 data class BookshelfDisplayConfig(
@@ -36,6 +37,7 @@ data class BookshelfDisplayConfig(
     val showBookName: Int,
     val marginPx: Int,
     val fastScrollerEnabled: Boolean,
+    val coverStyle: Int,
 ) {
 
     /** 书籍是否网格布局（列数 ≥ 2） */
@@ -83,6 +85,7 @@ data class BookshelfDisplayConfig(
             showBookName = AppConfig.showBookname,
             marginPx = AppConfig.bookshelfMargin,
             fastScrollerEnabled = AppConfig.showBookshelfFastScroller,
+            coverStyle = AppConfig.bookshelfCoverStyle,
         )
     }
 }

@@ -25,6 +25,9 @@ object PreferKey {
     const val coverShowAuthorN = "coverShowAuthorN"
     const val coverHtmlEnable = "coverHtmlEnable"
     const val bookCoverShadow = "bookCoverShadow"
+
+    /** 书架封面「立体封面」档位：0 无 / 1 光影 / 2 折痕 / 3 书脊 */
+    const val bookshelfCoverStyle = "bookshelfCoverStyle"
     const val paragraphBubblePackage = "paragraphBubblePackage"
     const val forceSoftwareParagraphBubble = "forceSoftwareParagraphBubble"
     const val remoteServerId = "remoteServerId"
