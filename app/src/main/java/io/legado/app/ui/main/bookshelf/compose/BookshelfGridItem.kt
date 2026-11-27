@@ -29,10 +29,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import io.legado.app.ui.theme.AppDimens
+import io.legado.app.ui.widget.components.AppBookCover
 
 /** 书架封面的阅读进度条是否显示。暂时屏蔽，改 true 即恢复原逻辑 */
 private const val SHOW_SHELF_PROGRESS = false
-import io.legado.app.ui.widget.components.AppBookCover
 
 /** 网格书名显示位置：0 封面下方 / 1 不显示 / 2 叠在封面上（与 AppConfig.showBookname 取值一致） */
 private const val SHOW_BOOK_NAME_BELOW = 0

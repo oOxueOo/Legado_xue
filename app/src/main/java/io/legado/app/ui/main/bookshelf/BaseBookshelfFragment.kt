@@ -223,7 +223,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
                         swShowBookshelfTagBar.isChecked = AppConfig.showBookshelfTagBar
-                        if (AppConfig.bookshelfCoverStyle !in rgCoverStyle.indices) {
+                        if (AppConfig.bookshelfCoverStyle !in 0 until rgCoverStyle.childCount) {
                             AppConfig.bookshelfCoverStyle = AppDimens.SHELF_COVER_STYLE_NONE
                         }
                         rgCoverStyle.checkByIndex(AppConfig.bookshelfCoverStyle)
