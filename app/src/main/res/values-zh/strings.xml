@@ -722,7 +722,7 @@
     <string name="smart_tag_rule_cannot_update">不可更新</string>
     <string name="smart_tag_rule_cannot_update_desc">已关闭自动更新</string>
 
-    <string name="show_bookshelf_tag_bar">显示标签栏</string>
+    <string name="show_bookshelf_tag_bar">显示书架标签</string>
     <string name="book_cover_style">立体封面</string>
     <string name="cover_style_none">无</string>
     <string name="cover_style_light">光影</string>
@@ -2095,8 +2095,8 @@
     <!-- 列表视图显示更多信息 -->
     <string name="show_more_info">显示更多信息</string>
     <string name="show_intro">显示简介</string>
-    <string name="show_bookshelf_read_progress">显示阅读进度</string>
-    <string name="show_category_info">显示分类信息等</string>
+    <string name="show_bookshelf_read_progress">显示进度</string>
+    <string name="show_category_info">显示分类</string>
     <string name="show_book_border">显示外边框</string>
     <!-- 简介行数选择 -->
     <string name="intro_lines">简介行数</string>
@@ -2104,6 +2104,7 @@
     <string name="intro_lines_2">2行</string>
     <string name="intro_lines_3">3行</string>
     <string name="intro_lines_4">4行</string>
+    <string name="intro_lines_value">%1$d 行</string>
     <!-- 下拉选择分组（仅分组样式为标签时生效） -->
     <string name="dropdown_select_group">下拉选择分组</string>
 

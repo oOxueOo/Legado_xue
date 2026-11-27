@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import androidx.core.view.indices
+import android.widget.TextView
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.LiveData
@@ -17,7 +17,6 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.config.AppConfig
-import io.legado.app.ui.theme.AppDimens
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.cache.CacheActivity
@@ -187,46 +186,91 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
             var showBookname = AppConfig.showBookname
             var bookLayout = AppConfig.bookLayout
             var folderLayout = AppConfig.folderLayout
+            var bookGroupStyle = AppConfig.bookGroupStyle
+            var coverStyle = AppConfig.bookshelfCoverStyle
+            val groupStyles = resources.getStringArray(R.array.group_style)
+            val bookViews = resources.getStringArray(R.array.book_view_dialog)
+            // 文件夹视图没有「紧凑列表」这一档：folderLayout 0 和 1 在渲染时走同一分支，显示完全一样
+            val folderViews = resources.getStringArray(R.array.folder_view_dialog)
+            val coverStyles = resources.getStringArray(R.array.cover_style)
+            val bookNameStyles = resources.getStringArray(R.array.book_name_style)
+            val sortStyles = resources.getStringArray(R.array.bookshelf_sort_style)
+            // 弹窗显示顺序 → 存储值：书籍视图（列表 / 网格二~六 / 紧凑列表）
+            val bookViewValues = intArrayOf(0, 2, 3, 4, 5, 6, 1)
+            val folderViewValues = intArrayOf(0, 2, 3, 4, 5, 6)
+            // 排序（按书名 / 按作者 / 手动排序 / 综合排序 / 按阅读时间 / 按更新时间）
+            val sortValues = intArrayOf(2, 5, 3, 4, 0, 1)
+            if (bookGroupStyle !in groupStyles.indices) {
+                bookGroupStyle = 0
+                AppConfig.bookGroupStyle = 0
+            }
+            if (bookLayout !in bookViews.indices) {
+                bookLayout = 0
+                AppConfig.bookLayout = 0
+            }
+            if (folderLayout !in folderViewValues) {
+                folderLayout = 0
+                AppConfig.folderLayout = 0
+            }
+            if (showBookname !in bookNameStyles.indices) {
+                showBookname = 0
+                AppConfig.showBookname = 0
+            }
+            if (coverStyle !in coverStyles.indices) {
+                coverStyle = 0
+                AppConfig.bookshelfCoverStyle = 0
+            }
+            if (bookshelfSort !in sortStyles.indices) {
+                bookshelfSort = 0
+                AppConfig.bookshelfSort = 0
+            }
             val alertBinding =
                 DialogBookshelfConfigBinding.inflate(layoutInflater)
                     .apply {
-                        if (AppConfig.bookGroupStyle !in 0..<spGroupStyle.count) {
-                            AppConfig.bookGroupStyle = 0
+                        // ---------- 第一段：取值行 ----------
+                        // 分组样式：标签(0) / 文件夹(1)，切到文件夹时下面紧跟出现「文件夹视图」
+                        llFolderView.visibility =
+                            if (bookGroupStyle == 1) View.VISIBLE else View.GONE
+                        swDropdownSelectGroup.visibility =
+                            if (bookGroupStyle == 0) View.VISIBLE else View.GONE
+                        bindValueRow(llGroupStyle, tvGroupStyle, R.string.group_style, groupStyles, intArrayOf(0, 1), { bookGroupStyle }) { which ->
+                            bookGroupStyle = which
+                            llFolderView.visibility =
+                                if (which == 1) View.VISIBLE else View.GONE
+                            swDropdownSelectGroup.visibility =
+                                if (which == 0) View.VISIBLE else View.GONE
                         }
-                        if (bookshelfSort !in rgSort.indices) {
-                            bookshelfSort = 0
-                            AppConfig.bookshelfSort = 0
+                        bindValueRow(llFolderView, tvFolderView, R.string.folder_view, folderViews, folderViewValues, { folderLayout }) { which ->
+                            folderLayout = which
                         }
-                        if (showBookname !in rgbLayout.indices) {
-                            showBookname = 0
-                            AppConfig.showBookname = 0
+                        bindValueRow(llBookView, tvBookView, R.string.book_view, bookViews, bookViewValues, { bookLayout }) { which ->
+                            bookLayout = which
+                            // 书名只在网格视图有意义；紧凑列表只有 48dp 封面，立体封面强制「无」
+                            bookNameChoice.visibility =
+                                if (which > 1) View.VISIBLE else View.GONE
+                            bookCoverStyleChoice.visibility =
+                                if (which == 1) View.GONE else View.VISIBLE
+                            llShowMoreInfo.visibility =
+                                if (which == 0) View.VISIBLE else View.GONE
+                            swShowBookBorder.visibility =
+                                if (which <= 1) View.VISIBLE else View.GONE
                         }
-                        spGroupStyle.setSelection(AppConfig.bookGroupStyle)
-                        spBookView.setSelection(bookLayout)
-                        spFolderView.setSelection(folderLayout)
-                        // 根据分组样式控制文件夹视图和下拉选择分组的可见性
-                        llFolderView.visibility = if (AppConfig.bookGroupStyle == 1) View.VISIBLE else View.GONE
-                        // 下拉选择分组开关仅在分组样式为标签（position == 0）时显示
-                        swDropdownSelectGroup.visibility = if (AppConfig.bookGroupStyle == 0) View.VISIBLE else View.GONE
+                        bindValueRow(bookCoverStyleChoice, tvCoverStyle, R.string.book_cover_style, coverStyles, intArrayOf(0, 1, 2, 3), { coverStyle }) { which ->
+                            coverStyle = which
+                        }
+                        bindValueRow(bookNameChoice, tvBookName, R.string.book_name, bookNameStyles, intArrayOf(0, 1, 2), { showBookname }) { which ->
+                            showBookname = which
+                        }
+                        bindValueRow(llSortRow, tvSort, R.string.sort, sortStyles, sortValues, { bookshelfSort }) { which ->
+                            bookshelfSort = which
+                        }
+                        // ---------- 第二段：开关 ----------
                         swDropdownSelectGroup.isChecked = AppConfig.dropdownSelectGroup
-                        // 监听分组样式变化，动态更新文件夹视图和下拉选择分组的可见性
-                        spGroupStyle.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                                llFolderView.visibility = if (position == 1) View.VISIBLE else View.GONE
-                                // 下拉选择分组开关仅在分组样式为标签（position == 0）时显示
-                                swDropdownSelectGroup.visibility = if (position == 0) View.VISIBLE else View.GONE
-                            }
-                            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-                        }
                         swShowUnread.isChecked = AppConfig.showUnread
                         swShowLastUpdateTime.isChecked = AppConfig.showLastUpdateTime
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
                         swShowBookshelfTagBar.isChecked = AppConfig.showBookshelfTagBar
-                        if (AppConfig.bookshelfCoverStyle !in 0 until rgCoverStyle.childCount) {
-                            AppConfig.bookshelfCoverStyle = AppDimens.SHELF_COVER_STYLE_NONE
-                        }
-                        rgCoverStyle.checkByIndex(AppConfig.bookshelfCoverStyle)
                         // 初始化"显示更多信息"相关开关状态
                         llShowMoreInfo.visibility = if (bookLayout == 0) View.VISIBLE else View.GONE
                         swShowMoreInfo.isChecked = AppConfig.showMoreInfoInList
@@ -234,30 +278,37 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         swShowCategoryInfo.isChecked = AppConfig.showCategoryInfoInList
                         swShowReadProgress.isChecked = AppConfig.showBookshelfReadProgress
                         // 书籍外边框开关（仅在列表/紧凑列表视图时显示，默认关闭）
-                        swShowBookBorder.visibility = if (bookLayout <= 1) View.VISIBLE else View.GONE
+                        swShowBookBorder.visibility =
+                            if (bookLayout <= 1) View.VISIBLE else View.GONE
                         swShowBookBorder.isChecked = AppConfig.showBookBorder
                         // 子菜单可见性
-                        swShowIntro.visibility = if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
-                        swShowCategoryInfo.visibility = if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
-                        swShowReadProgress.visibility = if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
+                        swShowIntro.visibility =
+                            if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
+                        swShowCategoryInfo.visibility =
+                            if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
+                        swShowReadProgress.visibility =
+                            if (AppConfig.showMoreInfoInList) View.VISIBLE else View.GONE
                         // 简介行数选择器可见性（仅在显示简介勾选时显示）
-                        tvIntroLines.visibility = if (AppConfig.showMoreInfoInList && AppConfig.showIntroInList) View.VISIBLE else View.GONE
+                        llIntroLines.visibility =
+                            if (AppConfig.showMoreInfoInList && AppConfig.showIntroInList) View.VISIBLE else View.GONE
                         // 更新简介行数显示文本
-                        tvIntroLines.text = "${getString(R.string.intro_lines)}: ${AppConfig.introLinesInList}"
+                        tvIntroLines.text = getString(R.string.intro_lines_value, AppConfig.introLinesInList)
                         // 监听"显示更多信息"开关变化
                         swShowMoreInfo.setOnCheckedChangeListener { _, isChecked ->
                             swShowIntro.visibility = if (isChecked) View.VISIBLE else View.GONE
                             swShowCategoryInfo.visibility = if (isChecked) View.VISIBLE else View.GONE
                             swShowReadProgress.visibility = if (isChecked) View.VISIBLE else View.GONE
                             // 更新简介行数选择器可见性
-                            tvIntroLines.visibility = if (isChecked && swShowIntro.isChecked) View.VISIBLE else View.GONE
+                            llIntroLines.visibility =
+                                if (isChecked && swShowIntro.isChecked) View.VISIBLE else View.GONE
                         }
                         // 监听"显示简介"开关变化
                         swShowIntro.setOnCheckedChangeListener { _, isChecked ->
-                            tvIntroLines.visibility = if (isChecked && swShowMoreInfo.isChecked) View.VISIBLE else View.GONE
+                            llIntroLines.visibility =
+                                if (isChecked && swShowMoreInfo.isChecked) View.VISIBLE else View.GONE
                         }
                         // 点击简介行数选择器，弹出 NumberPickerDialog
-                        tvIntroLines.setOnClickListener {
+                        llIntroLines.setOnClickListener {
                             NumberPickerDialog(requireContext())
                                 .setTitle(getString(R.string.intro_lines))
                                 .setMinValue(1)
@@ -265,30 +316,17 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                                 .setValue(AppConfig.introLinesInList)
                                 .show { newValue ->
                                     AppConfig.introLinesInList = newValue
-                                    tvIntroLines.text = "${getString(R.string.intro_lines)}: ${AppConfig.introLinesInList}"
+                                    tvIntroLines.text = getString(R.string.intro_lines_value, newValue)
                                     // 立即刷新书架以应用简介行数变化
                                     postEvent(EventBus.BOOKSHELF_REFRESH, "")
                                 }
                         }
-                        rgbLayout.checkByIndex(showBookname)
-                        // 根据书籍视图控制书名显示选项的可见性
-                        bookNameChoice.visibility = if (bookLayout > 1) View.VISIBLE else View.GONE
-                        // 紧凑列表只有 48dp 封面，立体封面强制为「无」，这一行也就没有意义
+                        // 根据书籍视图控制书名 / 立体封面的可见性
+                        bookNameChoice.visibility =
+                            if (bookLayout > 1) View.VISIBLE else View.GONE
                         bookCoverStyleChoice.visibility =
                             if (bookLayout == 1) View.GONE else View.VISIBLE
-                        spBookView.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                                bookNameChoice.visibility = if (position > 1) View.VISIBLE else View.GONE
-                                bookCoverStyleChoice.visibility =
-                                    if (position == 1) View.GONE else View.VISIBLE
-                                // 根据书籍视图控制"显示更多信息"的可见性（仅在标准列表视图时显示）
-                                llShowMoreInfo.visibility = if (position == 0) View.VISIBLE else View.GONE
-                                // 书籍外边框开关（仅在列表/紧凑列表视图时显示）
-                                swShowBookBorder.visibility = if (position <= 1) View.VISIBLE else View.GONE
-                            }
-                            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-                        }
-                        rgSort.checkByIndex(bookshelfSort)
+                        // ---------- 间距 ----------
                         margin.progress = AppConfig.bookshelfMargin
                     }
             customView { alertBinding.root }
@@ -296,20 +334,20 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                 alertBinding.apply {
                     var recreate = false
                     var refreshBookshelf = false
-                    if (AppConfig.bookGroupStyle != spGroupStyle.selectedItemPosition) {
-                        AppConfig.bookGroupStyle = spGroupStyle.selectedItemPosition
+                    if (AppConfig.bookGroupStyle != bookGroupStyle) {
+                        AppConfig.bookGroupStyle = bookGroupStyle
                         recreate = true // 分组样式改变需要重新创建Activity
                     }
-                    if (bookLayout != spBookView.selectedItemPosition) {
-                        AppConfig.bookLayout = spBookView.selectedItemPosition
+                    if (AppConfig.bookLayout != bookLayout) {
+                        AppConfig.bookLayout = bookLayout
                         refreshBookshelf = true
                     }
-                    if (folderLayout != spFolderView.selectedItemPosition) {
-                        AppConfig.folderLayout = spFolderView.selectedItemPosition
+                    if (AppConfig.folderLayout != folderLayout) {
+                        AppConfig.folderLayout = folderLayout
                         refreshBookshelf = true
                     }
-                    if (showBookname != rgbLayout.getCheckedIndex()) {
-                        AppConfig.showBookname = rgbLayout.getCheckedIndex()
+                    if (AppConfig.showBookname != showBookname) {
+                        AppConfig.showBookname = showBookname
                         // 书架列表已 Compose 化，条目读取走 BOOKSHELF_REFRESH 重新加载的显示配置，
                         // 不再需要整页重建
                         refreshBookshelf = true
@@ -339,8 +377,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
                     }
                     // 立体封面档位：只影响封面绘制，不改条目尺寸，刷新一次即可
-                    if (AppConfig.bookshelfCoverStyle != rgCoverStyle.getCheckedIndex()) {
-                        AppConfig.bookshelfCoverStyle = rgCoverStyle.getCheckedIndex()
+                    if (AppConfig.bookshelfCoverStyle != coverStyle) {
+                        AppConfig.bookshelfCoverStyle = coverStyle
                         refreshBookshelf = true
                     }
                     // 保存"显示更多信息"相关配置
@@ -371,8 +409,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         AppConfig.dropdownSelectGroup = swDropdownSelectGroup.isChecked
                         recreate = true // 下拉选择分组改变需要重新创建Activity以更新标题栏行为
                     }
-                    if (bookshelfSort != rgSort.getCheckedIndex()) {
-                        AppConfig.bookshelfSort = rgSort.getCheckedIndex()
+                    if (AppConfig.bookshelfSort != bookshelfSort) {
+                        AppConfig.bookshelfSort = bookshelfSort
                         upSort()
                     }
                     if (recreate) {
@@ -383,6 +421,36 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                 }
             }
             cancelButton()
+        }
+    }
+
+    /**
+     * 取值行：左侧标题 + 右侧当前值，点右侧弹出单选列表，选完即更新文字，
+     * 「确定」时统一写回配置。
+     * values：弹窗显示序号 → 实际存储值，用于「显示顺序」和「存储语义」不一致的行。
+     */
+    private fun bindValueRow(
+        row: View,
+        valueView: TextView,
+        titleRes: Int,
+        items: Array<String>,
+        values: IntArray,
+        getValue: () -> Int,
+        setValue: (Int) -> Unit
+    ) {
+        fun displayIndex(): Int =
+            values.indexOfFirst { it == getValue() }.takeIf { it >= 0 } ?: 0
+        valueView.text = items[displayIndex()]
+        row.setOnClickListener {
+            val checked = displayIndex()
+            alert(titleResource = titleRes) {
+                singleChoiceItems(items, checked) { dialog, which ->
+                    dialog.dismiss()
+                    setValue(values[which])
+                    valueView.text = items[which]
+                }
+                cancelButton()
+            }
         }
     }
 

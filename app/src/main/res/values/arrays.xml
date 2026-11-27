@@ -293,4 +293,46 @@
         <item>By mark</item>
         <item>By regex</item>
     </string-array>
+    <!-- 书架封面「立体封面」档位：0 无 / 1 光影 / 2 折痕 / 3 书脊（顺序即存值） -->
+    <string-array name="cover_style">
+        <item>@string/cover_style_none</item>
+        <item>@string/cover_style_light</item>
+        <item>@string/cover_style_crease</item>
+        <item>@string/cover_style_spine</item>
+    </string-array>
+    <!-- 书架书名显示方式：显示 / 隐藏 / 叠加 -->
+    <string-array name="book_name_style">
+        <item>@string/show</item>
+        <item>@string/hide</item>
+        <item>@string/overlay</item>
+    </string-array>
+    <!-- 书架布局弹窗「排序」行的取值 -->
+    <string-array name="bookshelf_sort_style">
+        <item>@string/bookshelf_px_2</item>
+        <item>@string/bookshelf_px_5</item>
+        <item>@string/bookshelf_px_3</item>
+        <item>@string/bookshelf_px_4</item>
+        <item>@string/bookshelf_px_0</item>
+        <item>@string/bookshelf_px_1</item>
+    </string-array>
+    <!-- 书架布局弹窗「书籍视图 / 文件夹视图」行的取值（紧凑列表排最后） -->
+    <string-array name="book_view_dialog">
+        <item>@string/layout_list</item>
+        <item>@string/layout_grid2</item>
+        <item>@string/layout_grid3</item>
+        <item>@string/layout_grid4</item>
+        <item>@string/layout_grid5</item>
+        <item>@string/layout_grid6</item>
+        <item>@string/layout_list_compact</item>
+    </string-array>
+
+    <!-- 文件夹视图：没有「紧凑列表」档，因为 folderLayout 0/1 渲染结果相同 -->
+    <string-array name="folder_view_dialog">
+        <item>@string/layout_list</item>
+        <item>@string/layout_grid2</item>
+        <item>@string/layout_grid3</item>
+        <item>@string/layout_grid4</item>
+        <item>@string/layout_grid5</item>
+        <item>@string/layout_grid6</item>
+    </string-array>
 </resources>

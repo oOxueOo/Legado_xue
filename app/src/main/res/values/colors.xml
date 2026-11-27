@@ -155,4 +155,8 @@
     <!-- 管理界面半透明层级色（日间用黑叠加，夜间用白叠加，随背景自然融合） -->
     <color name="background_card_surface">#0F000000</color>
     <color name="border_card_surface">#1A000000</color>
+
+    <!-- 书架布局弹窗取值行：下划线 + 小三角 -->
+    <color name="value_row_line">#669E9E9E</color>
+    <color name="value_row_arrow">#99999999</color>
 </resources>
