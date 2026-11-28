@@ -102,7 +102,7 @@ private const val WIDE_COVER_SCRIM = 0.18f
  * 从后台切回、主题重建后，整屏条目同帧发请求、同帧 decode，主线程会被一连串
  * 大图解码压住。这里限 3 个并发，并让同批请求按序号错帧进入，把解码摊到多帧上。
  */
-private val coverLoadSemaphore = Semaphore(permits = 3, acquiredPermits = 3)
+private val coverLoadSemaphore = Semaphore(permits = 3)
 
 /** 请求序号：只用来算错帧延迟，不求精确 */
 private val coverLoadTicket = AtomicInteger(0)
