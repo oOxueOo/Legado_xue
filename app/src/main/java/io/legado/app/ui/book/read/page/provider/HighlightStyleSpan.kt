@@ -167,6 +167,6 @@ class ZeroAdvanceSpan(private val offsetX: Float = 0f) : ReplacementSpan() {
         paint: Paint,
     ) {
         if (offsetX == 0f) return
-        canvas.drawText(text, start, end, x + offsetX, y, paint)
+        canvas.drawText(text, start, end, x + offsetX, y.toFloat(), paint)
     }
 }
