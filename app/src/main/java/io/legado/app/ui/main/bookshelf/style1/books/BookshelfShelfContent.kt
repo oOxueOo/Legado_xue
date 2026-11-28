@@ -52,7 +52,22 @@ internal fun BookshelfShelfContent(
 ) {
     val wideMedia = displayConfig.mediaWideCover &&
         (groupId == BookGroup.IdAudio || groupId == BookGroup.IdVideo)
-    if (displayConfig.isGrid && !wideMedia) {
+    if (wideMedia) {
+        // 音频 / 视频组：两列 16:9 横卡，列数固定 2，不跟随全局布局与列表/紧凑切换
+        BookshelfGridContent(
+            modifier = modifier,
+            shelfItems = shelfItems,
+            displayConfig = displayConfig,
+            bottomPaddingPx = bottomPaddingPx,
+            scrollToTopTick = scrollToTopTick,
+            immediateScrollToTopTick = immediateScrollToTopTick,
+            onScrollBackwardChange = onScrollBackwardChange,
+            onBookClick = onBookClick,
+            onBookLongClick = onBookLongClick,
+            columns = 2,
+            wideMediaItems = true,
+        )
+    } else if (displayConfig.isGrid) {
         BookshelfGridContent(
             modifier = modifier,
             shelfItems = shelfItems,
@@ -69,7 +84,7 @@ internal fun BookshelfShelfContent(
             modifier = modifier,
             shelfItems = shelfItems,
             displayConfig = displayConfig,
-            wideMedia = wideMedia,
+            wideMedia = false,
             bottomPaddingPx = bottomPaddingPx,
             scrollToTopTick = scrollToTopTick,
             immediateScrollToTopTick = immediateScrollToTopTick,
@@ -165,6 +180,10 @@ private fun BookshelfGridContent(
     onScrollBackwardChange: (Boolean) -> Unit,
     onBookClick: (BookshelfBookItem) -> Unit,
     onBookLongClick: (BookshelfBookItem) -> Unit,
+    /** 强制列数（音频 / 视频组固定两列）；为 null 时跟用户设置的宫格列数 */
+    columns: Int? = null,
+    /** 音视频条目改画横卡，其余条目仍走网格 */
+    wideMediaItems: Boolean = false,
 ) {
     val gridState = rememberLazyGridState()
     val spacing = rememberShelfSpacing(displayConfig.marginPx, bottomPaddingPx)
@@ -190,7 +209,7 @@ private fun BookshelfGridContent(
     }
     Box(modifier = modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(displayConfig.bookLayout.coerceAtLeast(2)),
+            columns = GridCells.Fixed(columns ?: displayConfig.bookLayout.coerceAtLeast(2)),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -203,12 +222,23 @@ private fun BookshelfGridContent(
             verticalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             items(items = shelfItems, key = { it.key }) { bookItem ->
-                BookshelfGridItem(
-                    bookItem = bookItem,
-                    displayConfig = displayConfig,
-                    onClick = onBookClick,
-                    onLongClick = onBookLongClick,
-                )
+                if (wideMediaItems &&
+                    (bookItem.display.isAudio || bookItem.display.isVideo)
+                ) {
+                    BookshelfWideMediaItem(
+                        bookItem = bookItem,
+                        displayConfig = displayConfig,
+                        onClick = onBookClick,
+                        onLongClick = onBookLongClick,
+                    )
+                } else {
+                    BookshelfGridItem(
+                        bookItem = bookItem,
+                        displayConfig = displayConfig,
+                        onClick = onBookClick,
+                        onLongClick = onBookLongClick,
+                    )
+                }
             }
         }
         if (displayConfig.fastScrollerEnabled) {

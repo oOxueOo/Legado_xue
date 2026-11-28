@@ -60,11 +60,29 @@ internal fun BookshelfShelfTreeContent(
 ) {
     val groupListStates = remember { hashMapOf<Long, LazyListState>() }
     val groupGridStates = remember { hashMapOf<Long, LazyGridState>() }
-    // 内置「音频」「视频」两组开横版时强制单列 16:9：宫格列数、列表/紧凑列表切换对它们无效。
+    // 内置「音频」「视频」两组开横版时固定两列 16:9：宫格列数、列表/紧凑列表切换对它们无效。
     // 自定义分组与混排组仍按全局布局，组内音视频卡跟随该组比例
     val wideMedia = displayConfig.mediaWideCover &&
         (groupId == BookGroup.IdAudio || groupId == BookGroup.IdVideo)
-    if (displayConfig.useSpanGrid && !wideMedia) {
+    if (wideMedia) {
+        // 音频 / 视频组：两列 16:9 横卡，列数固定 2，不跟随全局布局与树形宫格列数
+        BookshelfGridContent(
+            modifier = modifier,
+            shelfEntries = shelfEntries,
+            displayConfig = displayConfig,
+            listState = remember(groupId) {
+                groupGridStates.getOrPut(groupId) { LazyGridState() }
+            },
+            bottomPaddingPx = bottomPaddingPx,
+            scrollToTopTick = scrollToTopTick,
+            immediateScrollToTopTick = immediateScrollToTopTick,
+            onScrollBackwardChange = onScrollBackwardChange,
+            onEntryClick = onEntryClick,
+            onEntryLongClick = onEntryLongClick,
+            columns = 2,
+            wideMedia = true,
+        )
+    } else if (displayConfig.useSpanGrid) {
         BookshelfGridContent(
             modifier = modifier,
             shelfEntries = shelfEntries,
@@ -84,7 +102,7 @@ internal fun BookshelfShelfTreeContent(
             modifier = modifier,
             shelfEntries = shelfEntries,
             displayConfig = displayConfig,
-            wideMedia = wideMedia,
+            wideMedia = false,
             listState = remember(groupId) {
                 groupListStates.getOrPut(groupId) { LazyListState() }
             },
@@ -180,6 +198,10 @@ private fun BookshelfGridContent(
     onScrollBackwardChange: (Boolean) -> Unit,
     onEntryClick: (BookshelfEntry) -> Unit,
     onEntryLongClick: (BookshelfEntry) -> Unit,
+    /** 强制列数（音频 / 视频组固定两列）；为 null 时跟用户设置的宫格列数 */
+    columns: Int? = null,
+    /** 音视频条目改画横卡，其余条目仍走网格 */
+    wideMedia: Boolean = false,
 ) {
     val spacing = rememberShelfSpacing(displayConfig.marginPx, bottomPaddingPx)
     // 搁板已取消：行距直接用用户设置里的书架间距，间距调大后书名可多显示几行
@@ -205,7 +227,7 @@ private fun BookshelfGridContent(
     }
     Box(modifier = modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(displayConfig.spanCount.coerceAtLeast(1)),
+            columns = GridCells.Fixed(columns ?: displayConfig.spanCount.coerceAtLeast(1)),
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -222,15 +244,19 @@ private fun BookshelfGridContent(
                 key = { it.key },
                 span = { entry ->
                     GridItemSpan(
-                        if (entry is BookshelfFolderEntry) displayConfig.folderGridSpan()
-                        else displayConfig.bookGridSpan()
+                        when {
+                            // 两列横卡：每项都占 1 列，文件夹也不例外
+                            wideMedia -> 1
+                            entry is BookshelfFolderEntry -> displayConfig.folderGridSpan()
+                            else -> displayConfig.bookGridSpan()
+                        }
                     )
                 },
             ) { entry ->
                 BookshelfEntryItem(
                     entry = entry,
                     displayConfig = displayConfig,
-                    wideMedia = false,
+                    wideMedia = wideMedia,
                     onClick = onEntryClick,
                     onLongClick = onEntryLongClick,
                 )
@@ -264,7 +290,7 @@ private fun BookshelfEntryItem(
                 onClick = { onClick(entry) },
                 onLongClick = { onLongClick(entry) },
             )
-        } else if (displayConfig.isGrid) {
+        } else if (displayConfig.isGrid || wideMedia) {
             BookshelfGridItem(
                 bookItem = entry.book,
                 displayConfig = displayConfig,

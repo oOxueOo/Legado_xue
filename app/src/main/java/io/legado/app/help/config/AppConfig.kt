@@ -938,7 +938,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val bookCoverShadow get() = appCtx.getPrefBoolean(PreferKey.bookCoverShadow, true)
 
-    /** 音频视频横版封面：内置「音频」「视频」两组强制单列 16:9 大卡 */
+    /** 音频视频横版封面：内置「音频」「视频」两组固定两列 16:9 卡 */
     var mediaWideCover: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.mediaWideCover)
         set(value) = appCtx.putPrefBoolean(PreferKey.mediaWideCover, value)

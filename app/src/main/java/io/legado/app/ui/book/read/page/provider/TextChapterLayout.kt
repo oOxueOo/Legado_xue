@@ -1702,9 +1702,11 @@ class TextChapterLayout(
             }
         }
 
-        // 首段符号悬挂：段首行首字是起首标点时，把缩进最末一格宽度置 0——标点落进这一格，
-        // 正文首字回到两格缩进线。宽度只改这一格，因此断行（StaticLayout 走 ZeroAdvanceSpan，
-        // ZhLayout 走 widths）与绘制读的是同一份宽度，换行点不会与显示错位。
+        // 首段符号悬挂：段首行首字是起首标点时，缩进两格**宽度不动**，只把标点这一列
+        // 整体左移一个字符宽——标点挂进缩进区第一格，正文首字仍落在两格缩进线上。
+        // 千万不能清零缩进格或把标点宽度算成 0：那等于整行少一格，缩进会塌成一格，
+        // 而且 StaticLayout 只是用来断行的，真正绘制是下面按 lineStart/lineEnd 逐字重建列，
+        // span 改动到不了绘制层，宽度一改就只剩错位。
         // 顶格行（无缩进）不悬挂：那里左边界就是版心，再左移会把标点挤进页边距。
         val hangIndentCell = punctHangIndent &&
             !isTitle &&
@@ -1712,9 +1714,6 @@ class TextChapterLayout(
             indentLength > 0 &&
             text.length > indentLength &&
             PunctuationRules.isPrePunctuation(text[indentLength].toString())
-        if (hangIndentCell) {
-            widthsArray[indentLength - 1] = 0f
-        }
         // 命中字距要计入断行，否则行尾命中时整行会被压窄、与预览的换行位置不一致；
         // 但列位置在加字符时按留白让位（见 addCharsToLine*），所以留白只并进"断行用的副本"，
         // 不污染 widthsArray，避免同一份留白被算两次
@@ -1748,23 +1747,7 @@ class TextChapterLayout(
                     text,
                     charStyles,
                     mergeWidthAdd(neighborPush?.widthAdd, matchSpacingWidths),
-                ).let { cs ->
-                    // 悬挂时：引号本身算 0 宽（正文因此回到两格线、断行也多出一格），
-                    // 字形向左平移一格落进缩进区。不能去动缩进占位格——那会把整行左移一格，
-                    // 看起来就是"缩进变成一格、引号还被正文压住"
-                    if (!hangIndentCell) {
-                        cs
-                    } else {
-                        SpannableStringBuilder(cs).apply {
-                            setSpan(
-                                ZeroAdvanceSpan(-indentCharWidth),
-                                indentLength,
-                                indentLength + 1,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                            )
-                        }
-                    }
-                },
+                ),
                 textPaint,
                 visibleWidth,
                 Layout.Alignment.ALIGN_NORMAL,
@@ -1934,6 +1917,8 @@ class TextChapterLayout(
                         // 行首落在气泡段内时整体右移 wrapStartBleed 让出左角（下方两个分支共用）
                         (if (lineIndex == 0) lineStartExtra else 0f) + wrapStartBleed
                     }
+                    // 单行段也会吃到首段符号悬挂：起首标点左移一格挂在缩进区
+                    val hang = hangIndentCell && !isTitle && lineIndex == 0
                     if (!isTitle && textFullJustify && endSqueezeNeeded) {
                         // 末行右端放不下段末外扩：走两端对齐的压缩分布。addCharsToLineMiddle 的
                         // 行尾基准是 visibleWidth，desiredWidth 补上全部外扩量后 residual 恒为负、
@@ -1944,11 +1929,15 @@ class TextChapterLayout(
                             desiredWidth + startX + endBleed + lineMatchSpacing, startX,
                             widths, srcList, clickList, charStyles, lineStart,
                             clampNegativeResidual = false,
+                            hangShiftIndex = if (hang) paragraphIndent.length else -1,
+                            hangShift = -indentCharWidth,
                         )
                     } else {
                         addCharsToLineNatural(
                             book, absStartX, textLine, words,
                             startX, !isTitle && lineIndex == 0, widths, srcList, clickList, charStyles, lineStart,
+                            hangShiftIndex = if (hang) paragraphIndent.length else -1,
+                            hangShift = -indentCharWidth,
                         )
                     }
                 }
@@ -2081,7 +2070,7 @@ class TextChapterLayout(
         startExtra: Float = 0f,
         /** 行末落在气泡段内时预留的角装饰宽度（见调用方 wrapEndBleed） **/
         wrapEndBleed: Float = 0f,
-        /** 段首符号悬挂：缩进最末一格画成 0 宽，起首标点落进该格 **/
+        /** 段首符号悬挂：缩进宽度不变，只把本行起首标点那一列左移一个字符宽 **/
         hangIndentCell: Boolean = false,
     ) {
         var x = startExtra
@@ -2090,16 +2079,18 @@ class TextChapterLayout(
                 book, absStartX, textLine, words,
                 x, true, textWidths, srcList, clickList, charStyles, lineStart,
                 extraRightMargin = wrapEndBleed,
+                // 自然排列时 words 从缩进格开始，标点位于索引 indentLength
+                hangShiftIndex = if (hangIndentCell) paragraphIndent.length else -1,
+                hangShift = -indentCharWidth,
             )
             return
         }
         val bodyIndent = paragraphIndent
         val indentExtra = columnIndentExtra
         repeat(bodyIndent.length) { index ->
-            // 段首有"强制"外扩时，最后一个缩进列要多让出外扩量，缩进后的文字随之整体右移；
-            // 悬挂时最末一格宽度为 0（标点自己占满那一格），外扩量仍加在这一格之后
-            val hanging = hangIndentCell && index == bodyIndent.lastIndex
-            val x1 = x + (if (hanging) 0f else indentCharWidth) +
+            // 段首有"强制"外扩时，最后一个缩进列要多让出外扩量，缩进后的文字随之整体右移。
+            // 悬挂不改变任何一格的宽度：缩进仍是完整两格，正文首字仍落在两格线
+            val x1 = x + indentCharWidth +
                 if (index == bodyIndent.lastIndex) indentExtra else 0f
             textLine.addColumn(
                 TextColumn(
@@ -2123,6 +2114,9 @@ class TextChapterLayout(
                 charStyles, lineStart + bodyIndent.length,
                 clampNegativeResidual = lineMatchSpacing > 0f && wrapEndBleed <= 0f,
                 wrapEndBleed = wrapEndBleed,
+                // 已去掉缩进前缀，起首标点就是本行第一个字符
+                hangShiftIndex = if (hangIndentCell) 0 else -1,
+                hangShift = -indentCharWidth,
             )
         }
     }
@@ -2159,6 +2153,9 @@ class TextChapterLayout(
         /** 行末落在气泡段内时预留的角装饰宽度：两端对齐按负 residual 压缩行宽让出，
          *  自然排列由 exceed 压回（见调用方 wrapEndBleed 的注释） */
         wrapEndBleed: Float = 0f,
+        /** 段首符号悬挂：把本行第 [hangShiftIndex] 个字符的列整体平移 [hangShift]（负值左移） */
+        hangShiftIndex: Int = -1,
+        hangShift: Float = 0f,
     ) {
         if (!textFullJustify) {
             addCharsToLineNatural(
@@ -2166,6 +2163,8 @@ class TextChapterLayout(
                 startX, false, textWidths, srcList,
                 clickList, charStyles, lineStart,
                 extraRightMargin = wrapEndBleed,
+                hangShiftIndex = hangShiftIndex,
+                hangShift = hangShift,
             )
             return
         }
@@ -2192,9 +2191,11 @@ class TextChapterLayout(
                 } else {
                     (x + cw)
                 }
+                // 悬挂标点：只平移这一列的绘制位置，宽度与推进都不变，后续字符位置不受影响
+                val hg = if (index == hangShiftIndex) hangShift else 0f
                 addCharToLine(
                     book, absStartX, textLine, char,
-                    x, x1, index + 1 == words.size, srcList,
+                    x + hg, x1 + hg, index + 1 == words.size, srcList,
                     clickList, charStyles, charIndex,
                 )
                 x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
@@ -2213,9 +2214,10 @@ class TextChapterLayout(
                 val charIndex = lineStart + index
                 x += charStyles.lineSpacingBefore(charIndex, index == 0)
                 val x1 = if (index != words.lastIndex) (x + cw + d) else (x + cw)
+                val hg = if (index == hangShiftIndex) hangShift else 0f
                 addCharToLine(
                     book, absStartX, textLine, char,
-                    x, x1, index + 1 == words.size, srcList,
+                    x + hg, x1 + hg, index + 1 == words.size, srcList,
                     clickList, charStyles, charIndex,
                 )
                 x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
@@ -2241,6 +2243,9 @@ class TextChapterLayout(
         lineStart: Int,
         /** 行末落在气泡段内时预留的角装饰宽度（见调用方 wrapEndBleed） */
         extraRightMargin: Float = 0f,
+        /** 段首符号悬挂：把本行第 [hangShiftIndex] 个字符的列整体平移 [hangShift]（负值左移） */
+        hangShiftIndex: Int = -1,
+        hangShift: Float = 0f,
     ) {
         val indentLength = paragraphIndent.length
         var x = startX
@@ -2253,13 +2258,15 @@ class TextChapterLayout(
             val charIndex = lineStart + index
             x += charStyles.lineSpacingBefore(charIndex, index == 0)
             val x1 = x + cw
+            // 悬挂标点：只平移这一列的绘制位置，宽度不变，后方字符不会跟着挪
+            val hg = if (index == hangShiftIndex) hangShift else 0f
             addCharToLine(
                 book,
                 absStartX,
                 textLine,
                 char,
-                x,
-                x1,
+                x + hg,
+                x1 + hg,
                 index + 1 == words.size,
                 srcList,
                 clickList,
