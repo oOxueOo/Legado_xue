@@ -1720,11 +1720,17 @@ class TextChapterLayout(
         // 注意 widthsArray 是复用缓存，长度可能大于 text.length（见 allocateFloatArray，
         // 上一段更长时尾部留下的还是脏数据），这里只能按文本长度取值
         val matchSpacingWidths = charStyles.matchSpacingWidths(text.length)
-        val layoutWidthsArray = if (matchSpacingWidths == null) {
+        // 段首符号悬挂时，起首标点在断行里按 0 宽参与：这一格不占行宽，
+        // 该行因此能多容纳一个字，绘制时再把标点压进缩进区（见 addCharsToLine*）。
+        // 必须复制成独立数组，widthsArray 是复用缓存，直接改会污染后续段落
+        val layoutWidthsArray = if (matchSpacingWidths == null && !hangIndentCell) {
             widthsArray
         } else {
             FloatArray(text.length) { index ->
-                widthsArray.getOrElse(index) { 0f } + matchSpacingWidths[index]
+                widthsArray.getOrElse(index) { 0f } +
+                    (matchSpacingWidths?.getOrElse(index) { 0f } ?: 0f)
+            }.also { arr ->
+                if (hangIndentCell) arr[indentLength] = 0f
             }
         }
         // 标点允许行首是「无视中文标点禁则」的诉求，只有自研断行器能实现（StaticLayout 由平台
@@ -2191,14 +2197,22 @@ class TextChapterLayout(
                 } else {
                     (x + cw)
                 }
-                // 悬挂标点：只平移这一列的绘制位置，宽度与推进都不变，后续字符位置不受影响
-                val hg = if (index == hangShiftIndex) hangShift else 0f
-                addCharToLine(
-                    book, absStartX, textLine, char,
-                    x + hg, x1 + hg, index + 1 == words.size, srcList,
-                    clickList, charStyles, charIndex,
-                )
-                x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
+                // 悬挂标点：画进缩进区、右缘贴住正文列，本身不占行宽
+                if (index == hangShiftIndex) {
+                    val xa = x + hangShift
+                    addCharToLine(
+                        book, absStartX, textLine, char,
+                        xa, xa + indentCharWidth, index + 1 == words.size, srcList,
+                        clickList, charStyles, charIndex,
+                    )
+                } else {
+                    addCharToLine(
+                        book, absStartX, textLine, char,
+                        x, x1, index + 1 == words.size, srcList,
+                        clickList, charStyles, charIndex,
+                    )
+                    x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
+                }
             }
         } else {
             val gapCount: Int = words.lastIndex
@@ -2214,13 +2228,22 @@ class TextChapterLayout(
                 val charIndex = lineStart + index
                 x += charStyles.lineSpacingBefore(charIndex, index == 0)
                 val x1 = if (index != words.lastIndex) (x + cw + d) else (x + cw)
-                val hg = if (index == hangShiftIndex) hangShift else 0f
-                addCharToLine(
-                    book, absStartX, textLine, char,
-                    x + hg, x1 + hg, index + 1 == words.size, srcList,
-                    clickList, charStyles, charIndex,
-                )
-                x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
+                // 悬挂标点：画进缩进区、右缘贴住正文列，本身不占行宽
+                if (index == hangShiftIndex) {
+                    val xa = x + hangShift
+                    addCharToLine(
+                        book, absStartX, textLine, char,
+                        xa, xa + indentCharWidth, index + 1 == words.size, srcList,
+                        clickList, charStyles, charIndex,
+                    )
+                } else {
+                    addCharToLine(
+                        book, absStartX, textLine, char,
+                        x, x1, index + 1 == words.size, srcList,
+                        clickList, charStyles, charIndex,
+                    )
+                    x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
+                }
             }
         }
         exceed(absStartX, textLine, words)
@@ -2257,23 +2280,33 @@ class TextChapterLayout(
             // 不计入字符列本身，背景也就不会跟着变宽
             val charIndex = lineStart + index
             x += charStyles.lineSpacingBefore(charIndex, index == 0)
-            val x1 = x + cw
-            // 悬挂标点：只平移这一列的绘制位置，宽度不变，后方字符不会跟着挪
-            val hg = if (index == hangShiftIndex) hangShift else 0f
+            // 悬挂标点：画在缩进区最后一格里、右缘贴住正文列，且本身不占行宽，
+            // 后面的字符直接从正文列接着排（断行时这一格也已按 0 宽计算）
+            val hangThis = index == hangShiftIndex
+            val xa: Float
+            val xb: Float
+            if (hangThis) {
+                xa = x + hangShift
+                xb = xa + indentCharWidth
+            } else {
+                xa = x
+                xb = x + cw
+            }
             addCharToLine(
                 book,
                 absStartX,
                 textLine,
                 char,
-                x + hg,
-                x1 + hg,
+                xa,
+                xb,
                 index + 1 == words.size,
                 srcList,
                 clickList,
                 charStyles,
                 charIndex,
             )
-            x = x1 + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
+            x = if (hangThis) x else
+                xb + charStyles.lineSpacingAfter(charIndex, index == words.lastIndex)
             if (hasIndent && index == indentLength - 1) {
                 textLine.indentWidth = x
             }
