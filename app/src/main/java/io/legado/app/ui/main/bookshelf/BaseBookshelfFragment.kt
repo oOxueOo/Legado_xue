@@ -326,6 +326,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                             if (bookLayout > 1) View.VISIBLE else View.GONE
                         bookCoverStyleChoice.visibility =
                             if (bookLayout == 1) View.GONE else View.VISIBLE
+                        // 音频视频横版封面（只影响内置音频/视频两组，默认关）
+                        swMediaWideCover.isChecked = AppConfig.mediaWideCover
                         // ---------- 间距 ----------
                         margin.progress = AppConfig.bookshelfMargin
                     }
@@ -350,6 +352,11 @@ abstract class BaseBookshelfFragment(layoutId: Int) :
                         AppConfig.showBookname = showBookname
                         // 书架列表已 Compose 化，条目读取走 BOOKSHELF_REFRESH 重新加载的显示配置，
                         // 不再需要整页重建
+                        refreshBookshelf = true
+                    }
+                    if (AppConfig.mediaWideCover != swMediaWideCover.isChecked) {
+                        // 只换布局与取图尺寸，不碰封面缓存：切回来不必整库重下
+                        AppConfig.mediaWideCover = swMediaWideCover.isChecked
                         refreshBookshelf = true
                     }
                     if (AppConfig.bookshelfMargin != margin.progress) {

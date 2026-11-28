@@ -164,6 +164,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                 PreferKey.textBottomJustify,
                 PreferKey.useZhLayout,
                 PreferKey.allowPunctAtLineStart,
+                PreferKey.punctHangIndent,
                 PreferKey.adaptSpecialStyle,
                 PreferKey.keepBlankLine,
                 -> {

@@ -134,6 +134,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books) {
                 BookshelfShelfContent(
                     shelfItems = shelfItems,
                     displayConfig = displayConfig,
+                    groupId = groupId,
                     bottomPaddingPx = bottomPaddingPx,
                     scrollToTopTick = scrollToTopTick,
                     immediateScrollToTopTick = immediateScrollToTopTick,

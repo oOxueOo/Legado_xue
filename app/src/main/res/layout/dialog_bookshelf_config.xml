@@ -448,15 +448,27 @@
 
 
 
+        <!-- 音频视频横版封面：内置「音频」「视频」两组单独给横卡（标题左、滑块右） -->
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_media_wide_cover"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingVertical="8dp"
+            android:text="@string/media_wide_cover"
+            android:textColor="@color/primaryText"
+            android:textSize="14sp"
+            app:layout_constraintTop_toBottomOf="@+id/sw_show_wait_up_books"
+            tools:ignore="TouchTargetSizeCheck" />
+
         <!-- 间距设置（下方留出空位，不贴着弹窗底边，方便拖动） -->
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/margin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="32dp"
             android:layout_marginBottom="24dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/sw_show_wait_up_books"
+            app:layout_constraintTop_toBottomOf="@+id/sw_media_wide_cover"
             app:max="60"
             app:title="@string/margin" />
 

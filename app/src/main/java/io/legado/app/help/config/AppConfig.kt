@@ -231,6 +231,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 ReadBookConfig.allowPunctAtLineStart =
                     appCtx.getPrefBoolean(PreferKey.allowPunctAtLineStart)
 
+            PreferKey.punctHangIndent ->
+                ReadBookConfig.punctHangIndent =
+                    appCtx.getPrefBoolean(PreferKey.punctHangIndent)
+
             PreferKey.userAgent -> userAgent = getPrefUserAgent()
 
             PreferKey.customHosts -> {
@@ -933,6 +937,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val loadCoverHighQuality get() = appCtx.getPrefBoolean(PreferKey.loadCoverHighQuality, false)
 
     val bookCoverShadow get() = appCtx.getPrefBoolean(PreferKey.bookCoverShadow, true)
+
+    /** 音频视频横版封面：内置「音频」「视频」两组强制单列 16:9 大卡 */
+    var mediaWideCover: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.mediaWideCover)
+        set(value) = appCtx.putPrefBoolean(PreferKey.mediaWideCover, value)
 
     /** 书架封面「立体封面」档位：0 无 / 1 光影 / 2 折痕 / 3 书脊；默认 0（保持 1.3.4 的纯封面观感） */
     var bookshelfCoverStyle: Int

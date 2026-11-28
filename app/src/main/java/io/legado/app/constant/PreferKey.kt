@@ -177,6 +177,8 @@ object PreferKey {
     const val exportUseReplace = "exportUseReplace"
     const val useZhLayout = "useZhLayout"
     const val allowPunctAtLineStart = "allowPunctAtLineStart"
+    const val punctHangIndent = "punctHangIndent"
+    const val mediaWideCover = "mediaWideCover"
     const val brightness = "brightness"
     const val nightBrightness = "nightBrightness"
     const val expandTextMenu = "expandTextMenu"

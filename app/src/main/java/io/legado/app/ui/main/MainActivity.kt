@@ -75,6 +75,7 @@ import io.legado.app.ui.main.explore.ExploreFragment
 import io.legado.app.ui.main.homepage.HomepageFragment
 import io.legado.app.ui.main.my.MyFragment
 import io.legado.app.ui.main.rss.RssFragment
+import io.legado.app.ui.widget.components.CoverCacheSignal
 import io.legado.app.ui.widget.StableLiquidGlassView
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.BadgeView
@@ -684,6 +685,9 @@ class MainActivity :
         // 或 recreate() 可能被 upSort() 异常阻断。
         // 在 onResume 中直接刷新背景图片，确保主题背景变更立即生效。
         upBackgroundImage()
+        // 回到前台：系统可能在后台回收了封面位图（内存紧张时 Glide 的缓存会被清），
+        // 这里推一次缓存代际，让可见封面各自判断"图还能不能画"，失效的补取、有效的跳过
+        CoverCacheSignal.bump()
         // 后台期间积压的 RECREATE 在此重建，保证只在本页回到前台时发生一次
         if (recreateOnResume) {
             recreateOnResume = false

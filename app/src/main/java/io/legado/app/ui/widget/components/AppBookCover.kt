@@ -18,10 +18,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -55,10 +57,13 @@ import io.legado.app.utils.textHeight
 import io.legado.app.utils.toStringArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -75,8 +80,8 @@ import kotlin.math.sin
  */
 private const val COVER_LOAD_ATTEMPTS = 2
 
-/** 两次尝试之间的间隔：给瞬时失败（并发被限速、连接被掐断）留出恢复时间 */
-private const val COVER_LOAD_RETRY_DELAY_MS = 1500L
+/** 两次尝试之间的间隔：短退避即可，长等只会让封面"卡在占位图"更久 */
+private const val COVER_LOAD_RETRY_DELAY_MS = 250L
 
 /**
  * 单次封面请求的上限。
@@ -86,6 +91,21 @@ private const val COVER_LOAD_RETRY_DELAY_MS = 1500L
  * 保持占位封面。超时把这个"静默挂起"转成失败，交给上面的重试。
  */
 private const val COVER_LOAD_TIMEOUT_MS = 12_000L
+
+/** 横版卡背景模糊半径与压暗：既让空处不刺眼，也不抢前景 */
+private val WIDE_COVER_BLUR = 18.dp
+private const val WIDE_COVER_SCRIM = 0.18f
+
+/**
+ * 封面请求并发闸门。
+ *
+ * 从后台切回、主题重建后，整屏条目同帧发请求、同帧 decode，主线程会被一连串
+ * 大图解码压住。这里限 3 个并发，并让同批请求按序号错帧进入，把解码摊到多帧上。
+ */
+private val coverLoadSemaphore = Semaphore(permits = 3, acquiredPermits = 3)
+
+/** 请求序号：只用来算错帧延迟，不求精确 */
+private val coverLoadTicket = AtomicInteger(0)
 
 // ── 立体封面（书架专用绘制）──────────────────────────────────────────────
 // 参数与效果图一一对应：折面宽 4dp、色带宽 4dp、折痕区 4dp、圆角 2dp、竹节 3 道 0.7dp，
@@ -327,6 +347,33 @@ private fun DrawScope.drawShelfCoverDecor(style: Int, cornerPx: Float, spineBase
 }
 
 /**
+ * 是否近似纯色封面：横版卡遇到纯色图不铺模糊（模糊纯色等于一块灰），直接填主色。
+ * 采样 8×8 看通道极差，超过阈值就当作有内容。
+ */
+internal fun isFlatColorCover(drawable: Drawable?): Boolean {
+    val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: return false
+    return runCatching {
+        val side = 8
+        val scaled = Bitmap.createScaledBitmap(bitmap, side, side, true)
+        val pixels = IntArray(side * side)
+        scaled.getPixels(pixels, 0, side, 0, 0, side, side)
+        if (scaled !== bitmap) scaled.recycle()
+        var minL = 255
+        var maxL = 0
+        pixels.forEach { px ->
+            val l = (((px shr 16 and 0xFF) * 299 + (px shr 8 and 0xFF) * 587 +
+                (px and 0xFF) * 114) / 1000)
+            if (l < minL) minL = l
+            if (l > maxL) maxL = l
+        }
+        maxL - minL <= FLAT_COVER_LUMA_RANGE
+    }.getOrDefault(false)
+}
+
+/** 纯色判定阈值：亮度极差在这个范围内按纯色处理 */
+private const val FLAT_COVER_LUMA_RANGE = 18
+
+/**
  * 取封面主色：缩成 16×16 后按 S·V 加权求色相均值，饱和度 ×1.15、明度 ×0.46。
  *
  * 与效果图脚本 `dominant_color()` 同一套算法：先按权重求色相单位向量，再回推色相；
@@ -410,6 +457,8 @@ fun AppBookCover(
     cornerRadius: Dp = AppDimens.bookCoverCornerRadius,
     coverStyle: Int = AppDimens.SHELF_COVER_STYLE_NONE,
     loadOnlyWifi: Boolean = false,
+    /** 横版填充（16:9 音视频卡）：整图 contain，空处用同帧模糊或主色补满 */
+    wideFill: Boolean = false,
 ) {
     val context = LocalContext.current
     // 图集取图是"库查询 + 文件读取"（顺序模式还要回写缓存）：必须按取图身份记忆。
@@ -450,10 +499,19 @@ fun AppBookCover(
     // 初值就是默认封面：与 View 版 placeholder(defaultDrawable) 一致，避免加载期间露出壁纸
     var drawable by remember(requestKey) { mutableStateOf(defaultCoverDrawable()) }
     var loadFailed by remember(requestKey) { mutableStateOf(false) }
+    // 上次生效的缓存代际：只有代际真的变了才做"图还活着吗"的检查
+    var seenGeneration by remember(requestKey) { mutableIntStateOf(CoverCacheSignal.generation) }
 
-    LaunchedEffect(requestKey, bounds) {
+    LaunchedEffect(requestKey, bounds, CoverCacheSignal.generation) {
         // 等控件测量出尺寸后再发请求，保证 override 的是真实显示尺寸
         if (bounds.width <= 0 || bounds.height <= 0) return@LaunchedEffect
+        // 缓存代际变化（清缓存 / 内存被回收 / 回到前台）：手上这张图还能画就直接用，
+        // 不重发请求；只有已被回收、或本来就停在失败态时才补发，避免整屏重取图
+        val generation = CoverCacheSignal.generation
+        if (generation != seenGeneration) {
+            seenGeneration = generation
+            if (!loadFailed && isDrawableUsable(drawable)) return@LaunchedEffect
+        }
         val loaded = when {
             htmlCover -> htmlCoverDrawable(context, name.orEmpty(), author)
             useDefaultCover -> defaultCoverDrawable()
@@ -529,12 +587,41 @@ fun AppBookCover(
             val cover = drawable
             val withText = drawName && !htmlCover && (defaultCoverShown || loadFailed)
             if (cover != null) {
-                Image(
-                    painter = remember(cover) { AppDrawablePainter(cover) },
-                    contentDescription = contentDescription,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                val painter = remember(cover) { AppDrawablePainter(cover) }
+                if (wideFill) {
+                    // 横版卡：背景层铺满（纯色封面填主色，其余用同帧模糊），前景层整图不裁切。
+                    // 模糊在 API 31 以下不生效，背景退化成"同图裁切"——比留黑边好接受
+                    val flat = remember(cover) { isFlatColorCover(cover) }
+                    val tint = remember(cover) { dominantCoverColor(cover) }
+                    if (flat && tint != null) {
+                        Box(modifier = Modifier.fillMaxSize().background(tint)) { }
+                    } else {
+                        Image(
+                            painter = painter,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().blur(WIDE_COVER_BLUR),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = WIDE_COVER_SCRIM))
+                        ) { }
+                    }
+                    Image(
+                        painter = painter,
+                        contentDescription = contentDescription,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Image(
+                        painter = painter,
+                        contentDescription = contentDescription,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
             // 有真实图片时只在加载失败后叠加书名；默认封面场景则始终叠加
             if (withText) {
@@ -668,14 +755,33 @@ internal suspend fun loadCoverDrawable(
     requestSize: IntSize,
     centerCrop: Boolean = true,
 ): Drawable? {
-    repeat(COVER_LOAD_ATTEMPTS) { attempt ->
-        val loaded = withTimeoutOrNull(COVER_LOAD_TIMEOUT_MS) {
-            loadCoverDrawableOnce(context, path, sourceOrigin, loadOnlyWifi, requestSize, centerCrop)
+    // 同批请求按序号错开 0–24ms 再进闸门：让解码落在不同帧上，而不是挤在同一帧
+    val ticket = coverLoadTicket.getAndIncrement()
+    if (ticket % 4 != 0) delay((ticket % 4) * 8L)
+    return coverLoadSemaphore.withPermit {
+        repeat(COVER_LOAD_ATTEMPTS) { attempt ->
+            val loaded = withTimeoutOrNull(COVER_LOAD_TIMEOUT_MS) {
+                loadCoverDrawableOnce(
+                    context, path, sourceOrigin, loadOnlyWifi, requestSize, centerCrop
+                )
+            }
+            if (loaded != null) return@withPermit loaded
+            if (attempt < COVER_LOAD_ATTEMPTS - 1) delay(COVER_LOAD_RETRY_DELAY_MS)
         }
-        if (loaded != null) return loaded
-        if (attempt < COVER_LOAD_ATTEMPTS - 1) delay(COVER_LOAD_RETRY_DELAY_MS)
+        null
     }
-    return null
+}
+
+/**
+ * 手上的封面图还能不能画。
+ *
+ * 位图被回收（OOM 回收、Glide 清缓存）后 Drawable 本身仍在，画出来却是空白，
+ * 这种情况必须当成"没有图"重取；动图等非位图 Drawable 一律按可用处理。
+ */
+private fun isDrawableUsable(drawable: Drawable?): Boolean = when (drawable) {
+    null -> false
+    is BitmapDrawable -> drawable.bitmap?.let { !it.isRecycled } ?: false
+    else -> true
 }
 
 /** [loadCoverDrawable] 的单次请求实现 */

@@ -31,6 +31,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.HtmlCoverRenderer
+import io.legado.app.ui.widget.components.CoverCacheSignal
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.theme.EInkRender
@@ -99,6 +100,8 @@ class CoverImageView @JvmOverloads constructor(
             HtmlCoverRenderer.clearCache()
             _nameBitmapCache.evictAll()
             _needNameBitmap.evictAll()
+            // 通知书架上的 Compose 封面：缓存代际变了，手上失效的图要补取
+            CoverCacheSignal.bump()
         }
 
         // Job 存储 tag key

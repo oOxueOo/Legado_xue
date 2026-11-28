@@ -262,6 +262,9 @@ object ReadBookConfig {
     /** 标点允许出现在行首：无视中文标点禁则，行满一律按宽度断行（需配合 ZhLayout） */
     var allowPunctAtLineStart = appCtx.getPrefBoolean(PreferKey.allowPunctAtLineStart)
 
+    /** 首段符号悬挂：段首行首字是起首标点时，让标点落进缩进最末一格，正文回到两格线 */
+    var punctHangIndent = appCtx.getPrefBoolean(PreferKey.punctHangIndent)
+
     val config get() = if (shareLayout) shareConfig else durConfig
 
     var bgAlpha: Int

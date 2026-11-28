@@ -25,6 +25,8 @@ import io.legado.app.ui.main.bookshelf.compose.BookshelfBookItem
 import io.legado.app.ui.main.bookshelf.compose.BookshelfDisplayConfig
 import io.legado.app.ui.main.bookshelf.compose.BookshelfGridItem
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItem
+import io.legado.app.ui.main.bookshelf.compose.BookshelfWideMediaItem
+import io.legado.app.data.entities.BookGroup
 import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.widget.components.VerticalScrollbar
 
@@ -38,6 +40,8 @@ import io.legado.app.ui.widget.components.VerticalScrollbar
 internal fun BookshelfShelfContent(
     shelfItems: List<BookshelfBookItem>,
     displayConfig: BookshelfDisplayConfig,
+    /** 当前分组的 groupId：只有内置「音频」「视频」两组走横版，自定义分组跟随全局布局 */
+    groupId: Long = -1L,
     bottomPaddingPx: Int,
     scrollToTopTick: Int,
     immediateScrollToTopTick: Int,
@@ -46,7 +50,9 @@ internal fun BookshelfShelfContent(
     onBookLongClick: (BookshelfBookItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (displayConfig.isGrid) {
+    val wideMedia = displayConfig.mediaWideCover &&
+        (groupId == BookGroup.IdAudio || groupId == BookGroup.IdVideo)
+    if (displayConfig.isGrid && !wideMedia) {
         BookshelfGridContent(
             modifier = modifier,
             shelfItems = shelfItems,
@@ -63,6 +69,7 @@ internal fun BookshelfShelfContent(
             modifier = modifier,
             shelfItems = shelfItems,
             displayConfig = displayConfig,
+            wideMedia = wideMedia,
             bottomPaddingPx = bottomPaddingPx,
             scrollToTopTick = scrollToTopTick,
             immediateScrollToTopTick = immediateScrollToTopTick,
@@ -78,6 +85,7 @@ private fun BookshelfListContent(
     modifier: Modifier,
     shelfItems: List<BookshelfBookItem>,
     displayConfig: BookshelfDisplayConfig,
+    wideMedia: Boolean,
     bottomPaddingPx: Int,
     scrollToTopTick: Int,
     immediateScrollToTopTick: Int,
@@ -119,12 +127,21 @@ private fun BookshelfListContent(
             verticalArrangement = Arrangement.spacedBy(spacing.itemSpacing),
         ) {
             items(items = shelfItems, key = { it.key }) { bookItem ->
-                BookshelfListItem(
-                    bookItem = bookItem,
-                    displayConfig = displayConfig,
-                    onClick = onBookClick,
-                    onLongClick = onBookLongClick,
-                )
+                if (wideMedia && (bookItem.display.isAudio || bookItem.display.isVideo)) {
+                    BookshelfWideMediaItem(
+                        bookItem = bookItem,
+                        displayConfig = displayConfig,
+                        onClick = onBookClick,
+                        onLongClick = onBookLongClick,
+                    )
+                } else {
+                    BookshelfListItem(
+                        bookItem = bookItem,
+                        displayConfig = displayConfig,
+                        onClick = onBookClick,
+                        onLongClick = onBookLongClick,
+                    )
+                }
             }
         }
         if (displayConfig.fastScrollerEnabled) {

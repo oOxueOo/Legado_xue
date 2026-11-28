@@ -131,3 +131,33 @@ class HighlightSpacingSpan(private val extraWidth: Float) : ReplacementSpan() {
         canvas.drawText(text, start, end, x, y.toFloat(), paint)
     }
 }
+
+/**
+ * 零宽占位 Span：用于「首段符号悬挂」。
+ *
+ * 段首缩进最末一格是占位的全角空格，悬挂要求这一格宽度为 0（让起首标点落进该格）。
+ * 用 ReplacementSpan 把它的步进改成 0，StaticLayout 便会按"少一格"的宽度断行，
+ * 与绘制层读到的同一份 0 宽保持一致。字符本身是空格，不需要绘制。
+ */
+class ZeroAdvanceSpan : ReplacementSpan() {
+
+    override fun getSize(
+        paint: Paint,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        fm: Paint.FontMetricsInt?,
+    ): Int = 0
+
+    override fun draw(
+        canvas: Canvas,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        x: Float,
+        top: Int,
+        y: Int,
+        bottom: Int,
+        paint: Paint,
+    ) = Unit
+}

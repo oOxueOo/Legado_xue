@@ -31,6 +31,8 @@ import io.legado.app.ui.main.bookshelf.compose.BookshelfFolderEntry
 import io.legado.app.ui.main.bookshelf.compose.BookshelfFolderItemView
 import io.legado.app.ui.main.bookshelf.compose.BookshelfGridItem
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItem
+import io.legado.app.ui.main.bookshelf.compose.BookshelfWideMediaItem
+import io.legado.app.data.entities.BookGroup
 import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.widget.components.VerticalScrollbar
 
@@ -58,7 +60,11 @@ internal fun BookshelfShelfTreeContent(
 ) {
     val groupListStates = remember { hashMapOf<Long, LazyListState>() }
     val groupGridStates = remember { hashMapOf<Long, LazyGridState>() }
-    if (displayConfig.useSpanGrid) {
+    // 内置「音频」「视频」两组开横版时强制单列 16:9：宫格列数、列表/紧凑列表切换对它们无效。
+    // 自定义分组与混排组仍按全局布局，组内音视频卡跟随该组比例
+    val wideMedia = displayConfig.mediaWideCover &&
+        (groupId == BookGroup.IdAudio || groupId == BookGroup.IdVideo)
+    if (displayConfig.useSpanGrid && !wideMedia) {
         BookshelfGridContent(
             modifier = modifier,
             shelfEntries = shelfEntries,
@@ -78,6 +84,7 @@ internal fun BookshelfShelfTreeContent(
             modifier = modifier,
             shelfEntries = shelfEntries,
             displayConfig = displayConfig,
+            wideMedia = wideMedia,
             listState = remember(groupId) {
                 groupListStates.getOrPut(groupId) { LazyListState() }
             },
@@ -96,6 +103,7 @@ private fun BookshelfListContent(
     modifier: Modifier,
     shelfEntries: List<BookshelfEntry>,
     displayConfig: BookshelfDisplayConfig,
+    wideMedia: Boolean,
     listState: LazyListState,
     bottomPaddingPx: Int,
     scrollToTopTick: Int,
@@ -144,6 +152,7 @@ private fun BookshelfListContent(
                 BookshelfEntryItem(
                     entry = entry,
                     displayConfig = displayConfig,
+                    wideMedia = wideMedia,
                     onClick = onEntryClick,
                     onLongClick = onEntryLongClick,
                 )
@@ -221,6 +230,7 @@ private fun BookshelfGridContent(
                 BookshelfEntryItem(
                     entry = entry,
                     displayConfig = displayConfig,
+                    wideMedia = false,
                     onClick = onEntryClick,
                     onLongClick = onEntryLongClick,
                 )
@@ -240,11 +250,21 @@ private fun BookshelfGridContent(
 private fun BookshelfEntryItem(
     entry: BookshelfEntry,
     displayConfig: BookshelfDisplayConfig,
+    wideMedia: Boolean,
     onClick: (BookshelfEntry) -> Unit,
     onLongClick: (BookshelfEntry) -> Unit,
 ) {
     when (entry) {
-        is BookshelfBookEntry -> if (displayConfig.isGrid) {
+        is BookshelfBookEntry -> if (wideMedia &&
+            (entry.book.display.isAudio || entry.book.display.isVideo)
+        ) {
+            BookshelfWideMediaItem(
+                bookItem = entry.book,
+                displayConfig = displayConfig,
+                onClick = { onClick(entry) },
+                onLongClick = { onLongClick(entry) },
+            )
+        } else if (displayConfig.isGrid) {
             BookshelfGridItem(
                 bookItem = entry.book,
                 displayConfig = displayConfig,

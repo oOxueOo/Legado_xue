@@ -38,6 +38,8 @@ data class BookshelfDisplayConfig(
     val marginPx: Int,
     val fastScrollerEnabled: Boolean,
     val coverStyle: Int,
+    /** 音频视频横版封面：内置「音频」「视频」两组走单列 16:9 大卡 */
+    val mediaWideCover: Boolean = false,
 ) {
 
     /** 书籍是否网格布局（列数 ≥ 2） */
@@ -86,6 +88,7 @@ data class BookshelfDisplayConfig(
             marginPx = AppConfig.bookshelfMargin,
             fastScrollerEnabled = AppConfig.showBookshelfFastScroller,
             coverStyle = AppConfig.bookshelfCoverStyle,
+            mediaWideCover = AppConfig.mediaWideCover,
         )
     }
 }
