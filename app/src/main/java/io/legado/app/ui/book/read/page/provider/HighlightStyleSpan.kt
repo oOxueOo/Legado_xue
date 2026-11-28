@@ -139,7 +139,13 @@ class HighlightSpacingSpan(private val extraWidth: Float) : ReplacementSpan() {
  * 用 ReplacementSpan 把它的步进改成 0，StaticLayout 便会按"少一格"的宽度断行，
  * 与绘制层读到的同一份 0 宽保持一致。字符本身是空格，不需要绘制。
  */
-class ZeroAdvanceSpan : ReplacementSpan() {
+/**
+ * 零宽度字符：占位宽度算 0，但仍把字形画出来，[offsetX] 决定画在哪儿。
+ *
+ * 用在"首段符号悬挂"上：段首的引号不占宽度（正文因此回到两格缩进线），
+ * 字形向左平移一格，正好落在缩进区里——标点挂出去，正文不被顶歪。
+ */
+class ZeroAdvanceSpan(private val offsetX: Float = 0f) : ReplacementSpan() {
 
     override fun getSize(
         paint: Paint,
@@ -159,5 +165,8 @@ class ZeroAdvanceSpan : ReplacementSpan() {
         y: Int,
         bottom: Int,
         paint: Paint,
-    ) = Unit
+    ) {
+        if (offsetX == 0f) return
+        canvas.drawText(text, start, end, x + offsetX, y, paint)
+    }
 }

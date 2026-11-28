@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.os.Build
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.text.TextPaint
@@ -67,6 +68,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlin.math.PI
 import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
@@ -92,9 +94,13 @@ private const val COVER_LOAD_RETRY_DELAY_MS = 250L
  */
 private const val COVER_LOAD_TIMEOUT_MS = 12_000L
 
-/** 横版卡背景模糊半径与压暗：既让空处不刺眼，也不抢前景 */
-private val WIDE_COVER_BLUR = 18.dp
-private const val WIDE_COVER_SCRIM = 0.18f
+/** 空处模糊填充的半径：模糊要够狠，留白才不会变成第二张"内容"（3:4 竖卡与 16:9 横卡共用） */
+private val COVER_FILL_BLUR = 22.dp
+/**
+ * 模糊底层的压暗：参考抖音信息流封面那种"两侧只做陪衬"的观感——压一点点即可，
+ * 压太重会像蒙了一层灰。0.10 是照着参考图调的。
+ */
+private const val COVER_FILL_SCRIM = 0.10f
 
 /**
  * 封面请求并发闸门。
@@ -457,7 +463,7 @@ fun AppBookCover(
     cornerRadius: Dp = AppDimens.bookCoverCornerRadius,
     coverStyle: Int = AppDimens.SHELF_COVER_STYLE_NONE,
     loadOnlyWifi: Boolean = false,
-    /** 横版填充（16:9 音视频卡）：整图 contain，空处用同帧模糊或主色补满 */
+    /** 音视频横卡填充：整图 contain、空处同帧模糊（纯色封面填主色）；竖卡不走这条 */
     wideFill: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -589,23 +595,46 @@ fun AppBookCover(
             if (cover != null) {
                 val painter = remember(cover) { AppDrawablePainter(cover) }
                 if (wideFill) {
-                    // 横版卡：背景层铺满（纯色封面填主色，其余用同帧模糊），前景层整图不裁切。
-                    // 模糊在 API 31 以下不生效，背景退化成"同图裁切"——比留黑边好接受
-                    val flat = remember(cover) { isFlatColorCover(cover) }
-                    val tint = remember(cover) { dominantCoverColor(cover) }
-                    if (flat && tint != null) {
-                        Box(modifier = Modifier.fillMaxSize().background(tint)) { }
-                    } else {
-                        Image(
-                            painter = painter,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().blur(WIDE_COVER_BLUR),
-                            contentScale = ContentScale.Crop,
-                        )
+                    // 只有音视频横卡走"整图 contain + 空处模糊"：竖卡（3:4 小说封面）保持原来的
+                    // 裁切填充观感，两种卡的取图都不裁，只是显示方式不同。
+                    // 图比例与框比例一致时空处为零，不铺模糊层，省掉每格一次的模糊绘制。
+                    val srcAspect = remember(cover) {
+                        if (cover.intrinsicHeight > 0) {
+                            cover.intrinsicWidth.toFloat() / cover.intrinsicHeight
+                        } else {
+                            0f
+                        }
+                    }
+                    val frameAspect = if (bounds.height > 0) bounds.width.toFloat() / bounds.height else 0f
+                    val needFill = srcAspect > 0f && frameAspect > 0f &&
+                        abs(srcAspect - frameAspect) / frameAspect > 0.005f
+                    // 纯色封面与主色取色：8×8 / 16×16 采样放后台，横卡首帧先按模糊画，取到色再换成主色
+                    var flatCover by remember(cover) { mutableStateOf(false) }
+                    var tintColor by remember(cover) { mutableStateOf<Color?>(null) }
+                    LaunchedEffect(cover) {
+                        val flat = withContext(Dispatchers.Default) { isFlatColorCover(cover) }
+                        val tint = withContext(Dispatchers.Default) { dominantCoverColor(cover) }
+                        flatCover = flat
+                        tintColor = tint
+                    }
+                    if (needFill && flatCover && tintColor != null) {
+                        Box(modifier = Modifier.fillMaxSize().background(tintColor!!)) { }
+                    } else if (needFill) {
+                        // 模糊在 API 31 以下不生效，这时用主色兜底；主色也取不到再退回同图铺底
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || tintColor == null) {
+                            Image(
+                                painter = painter,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize().blur(COVER_FILL_BLUR),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Box(modifier = Modifier.fillMaxSize().background(tintColor!!)) { }
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = WIDE_COVER_SCRIM))
+                                .background(Color.Black.copy(alpha = COVER_FILL_SCRIM))
                         ) { }
                     }
                     Image(
@@ -744,8 +773,9 @@ internal fun BookCoverTextOverlay(
  *
  * 单次请求带超时、失败后有界重试，原因见 [COVER_LOAD_TIMEOUT_MS]、[COVER_LOAD_ATTEMPTS]。
  *
- * @param centerCrop 请求是否 centerCrop；瀑布流等自由比例场景传 false，
- *   保持图片原始宽高比（对齐 View 版 CoverLoader 的 fixedRatio = false）
+ * @param centerCrop 请求是否 centerCrop。默认 false：取图一律不裁，只按目标尺寸等比缩小，
+ *   留完整的图给显示层自己决定怎么铺（横卡 contain + 模糊补空、竖卡 3:4 由显示层裁）。
+ *   在取图处裁会把原图永久切掉，同一张图换个比例就没法还原了。
  */
 internal suspend fun loadCoverDrawable(
     context: Context,
@@ -753,7 +783,7 @@ internal suspend fun loadCoverDrawable(
     sourceOrigin: String?,
     loadOnlyWifi: Boolean,
     requestSize: IntSize,
-    centerCrop: Boolean = true,
+    centerCrop: Boolean = false,
 ): Drawable? {
     // 同批请求按序号错开 0–24ms 再进闸门：让解码落在不同帧上，而不是挤在同一帧
     val ticket = coverLoadTicket.getAndIncrement()

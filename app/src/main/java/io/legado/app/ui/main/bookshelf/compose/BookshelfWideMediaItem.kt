@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.ui.theme.AppDimens
 import io.legado.app.ui.widget.components.AppBookCover
@@ -20,10 +21,16 @@ import io.legado.app.ui.widget.components.AppBookCover
 /** 横卡比例：固定 16:9，不再跟随封面 3:4 */
 const val WIDE_MEDIA_COVER_ASPECT = 16f / 9f
 
+/** 横卡书名最多折 3 行；超出直接截断，不加省略号 */
+private const val WIDE_MEDIA_NAME_MAX_LINES = 3
+
+/** 横卡行间额外留白（左右方向不加，宽度要满格） */
+private val WIDE_MEDIA_ROW_EXTRA_GAP = 6.dp
+
 /**
  * 音频 / 视频的横版条目。
  *
- * 强制一排一个：封面 16:9 整图不裁切、空处同帧模糊或主色补满，书名在卡下一行。
+ * 一排一个：封面 16:9 整图不裁切、空处同帧模糊或主色补满；书名在卡下方，可折 1–3 行、不加省略号。
  * 宫格列数与列表/紧凑列表切换对这两组无效——横卡只跟屏宽走，所以不带列数参数。
  * 横版下不叠立体封面，只保留平面书框（cornerRadius 沿用书架的圆角）。
  */
@@ -40,7 +47,9 @@ fun BookshelfWideMediaItem(
         modifier = modifier
             .fillMaxWidth()
             .combinedClickable(onClick = { onClick(bookItem) }, onLongClick = { onLongClick(bookItem) })
-            .padding(AppDimens.shelfGridItemPadding),
+            // 横卡比网格条目高，行间再补一点留白，书名多行时不至于黏在一起
+            .padding(AppDimens.shelfGridItemPadding)
+            .padding(vertical = WIDE_MEDIA_ROW_EXTRA_GAP),
     ) {
         AppBookCover(
             modifier = Modifier
@@ -61,7 +70,7 @@ fun BookshelfWideMediaItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = AppDimens.shelfGridNameSpacing),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             Text(
                 text = bookItem.display.name,
@@ -71,8 +80,9 @@ fun BookshelfWideMediaItem(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = SHELF_TITLE_TEXT_SIZE.sp,
                 lineHeight = SHELF_TITLE_LINE_HEIGHT.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // 书名不省略：按宽度折行，最多 3 行；再长就截断，不加省略号
+                maxLines = WIDE_MEDIA_NAME_MAX_LINES,
+                overflow = TextOverflow.Clip,
             )
             BookshelfItemStatus(
                 modifier = Modifier.padding(start = AppDimens.shelfBadgeRowSpacing),
@@ -81,19 +91,6 @@ fun BookshelfWideMediaItem(
                 loadingSize = AppDimens.shelfListLoadingSize,
             )
         }
-        bookItem.display.author.takeIf { it.isNotBlank() }?.let { author ->
-            Text(
-                text = author,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = AppDimens.shelfTitleStartPadding, top = AppDimens.shelfMetaSpacing),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = SHELF_META_TEXT_SIZE.sp,
-                lineHeight = SHELF_META_LINE_HEIGHT.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        // 其余信息（章节、简介、标签）在横卡上会撑高卡片，按口径只留书名与作者
+        // 横卡不留作者行，也不放章节/简介/标签：书名已占 1–3 行，再加就会把卡撑高
     }
 }

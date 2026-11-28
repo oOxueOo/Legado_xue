@@ -1749,15 +1749,17 @@ class TextChapterLayout(
                     charStyles,
                     mergeWidthAdd(neighborPush?.widthAdd, matchSpacingWidths),
                 ).let { cs ->
-                    // 悬挂时 StaticLayout 也要按"最末一格为 0"断行，否则会把标点挤到下一行
+                    // 悬挂时：引号本身算 0 宽（正文因此回到两格线、断行也多出一格），
+                    // 字形向左平移一格落进缩进区。不能去动缩进占位格——那会把整行左移一格，
+                    // 看起来就是"缩进变成一格、引号还被正文压住"
                     if (!hangIndentCell) {
                         cs
                     } else {
                         SpannableStringBuilder(cs).apply {
                             setSpan(
-                                ZeroAdvanceSpan(),
-                                indentLength - 1,
+                                ZeroAdvanceSpan(-indentCharWidth),
                                 indentLength,
+                                indentLength + 1,
                                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
                             )
                         }
